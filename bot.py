@@ -5,12 +5,12 @@ import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application,
+    Updater,
     CommandHandler,
-    ContextTypes,
+    CallbackContext,
     CallbackQueryHandler,
     MessageHandler,
-    filters
+    Filters
 )
 
 from sms_activate_api import sms_api, RequestError
@@ -58,7 +58,7 @@ orders_db = {}
 
 # ========== دوال البوت ==========
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def start(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
     user_id = user.id
     
@@ -83,16 +83,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_html(
+    update.message.reply_html(
         f"مرحباً {user.mention_html()}! 👋\n\n"
         "أهلاً بك في بوت شراء الأرقام الافتراضية.\n"
         "اختر الخدمة التي تريدها من القائمة:",
         reply_markup=reply_markup
     )
 
-async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def show_balance(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     user_id = query.from_user.id
     try:
@@ -109,14 +109,14 @@ async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='main_menu')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+        query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
         
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
+        query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
 
-async def buy_numbers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def buy_numbers_menu(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     keyboard = []
     for service_code, service_name in SERVICES.items():
@@ -125,15 +125,15 @@ async def buy_numbers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     keyboard.append([InlineKeyboardButton('🔙 العودة', callback_data='main_menu')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(
+    query.edit_message_text(
         "🛍️ **اختر الخدمة:**\n\nاختر الخدمة التي تريد شراء رقم لها:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
 
-async def show_countries(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def show_countries(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     service_code = query.data.split('_')[1]
     context.user_data['selected_service'] = service_code
@@ -158,18 +158,18 @@ async def show_countries(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         keyboard.append([InlineKeyboardButton('🔙 العودة', callback_data='buy_numbers')])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(
+        query.edit_message_text(
             f"🌍 **اختر الدولة للخدمة: {SERVICES[service_code]}**\n\nاختر الدولة التي تريد الرقم منها:",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
         
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
+        query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
 
-async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def request_number(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     country_id = int(query.data.split('_')[1])
     service_code = context.user_data.get('selected_service')
@@ -198,7 +198,7 @@ async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(
+        query.edit_message_text(
             f"✅ **تم شراء الرقم بنجاح!**\n\n"
             f"📱 **الرقم:** `{number_info['number']}`\n"
             f"🛍️ **الخدمة:** {SERVICES[service_code]}\n"
@@ -209,11 +209,11 @@ async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ في طلب الرقم: {str(e)}")
+        query.edit_message_text(f"❌ حدث خطأ في طلب الرقم: {str(e)}")
 
-async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def get_code(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     order_id = query.data.split('_')[2]
     
@@ -224,7 +224,7 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             orders_db[order_id]['status'] = 'completed'
             orders_db[order_id]['code'] = status_info['code']
             
-            await query.edit_message_text(
+            query.edit_message_text(
                 f"🎉 **تم استلام الكود بنجاح!**\n\n"
                 f"🔢 **الكود:** `{status_info['code']}`\n"
                 f"🆔 **رقم الطلب:** `{order_id}`\n\n"
@@ -238,18 +238,18 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await query.edit_message_text(
+            query.edit_message_text(
                 f"⏳ **في انتظار الكود...**\n\nلم يصل الكود بعد. يرجى الانتظار قليلاً ثم الضغط على تحديث.",
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
             
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
+        query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
 
-async def cancel_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def cancel_order(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     order_id = query.data.split('_')[1]
     
@@ -259,21 +259,21 @@ async def cancel_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if order_id in orders_db:
             orders_db[order_id]['status'] = 'cancelled'
         
-        await query.edit_message_text(
+        query.edit_message_text(
             f"✅ **تم إلغاء الطلب بنجاح**\n\n🆔 رقم الطلب: `{order_id}`\nتم إلغاء الطلب واسترجاع الرصيد.",
             parse_mode='Markdown'
         )
         
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ في الإلغاء: {str(e)}")
+        query.edit_message_text(f"❌ حدث خطأ في الإلغاء: {str(e)}")
 
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def admin_panel(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     user_id = query.from_user.id
     if user_id not in ADMIN_IDS:
-        await query.edit_message_text("❌ ليس لديك صلاحية الوصول لهذه اللوحة.")
+        query.edit_message_text("❌ ليس لديك صلاحية الوصول لهذه اللوحة.")
         return
     
     try:
@@ -303,14 +303,14 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             f"• الطلبات النشطة: {active_orders}"
         )
         
-        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+        query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
         
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
+        query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
 
-async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def main_menu(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     user = query.from_user
     user_id = user.id
@@ -327,116 +327,79 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(
+    query.edit_message_text(
         f"مرحباً {user.first_name}! 👋\n\n"
         "أهلاً بك في بوت شراء الأرقام الافتراضية.\n"
         "اختر الخدمة التي تريدها من القائمة:",
         reply_markup=reply_markup
     )
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
+def handle_message(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(
         "يرجى استخدام الأزرار في القائمة للتفاعل مع البوت.\nاكتب /start لعرض القائمة الرئيسية."
     )
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+def error_handler(update: Update, context: CallbackContext) -> None:
     logger.error(f"حدث خطأ: {context.error}")
 
-# ========== إعدادات Webhook ==========
-
-async def set_webhook(application: Application):
-    """تعيين Webhook"""
-    if WEBHOOK_URL:
-        webhook_url = f"{WEBHOOK_URL}/webhook"
-        await application.bot.set_webhook(url=webhook_url)
-        logger.info(f"✅ تم تعيين Webhook: {webhook_url}")
-    else:
-        logger.warning("❌ لم يتم تعيين WEBHOOK_URL، البوت سيعمل بـ Polling")
-
-async def on_startup(application: Application):
-    """تشغيل عند بدء التطبيق"""
-    await set_webhook(application)
-    logger.info("✅ البوت يعمل باستخدام Webhooks")
-
-def setup_handlers(application: Application):
+def setup_handlers(updater: Updater):
     """إعداد معالجات البوت"""
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    dp = updater.dispatcher
+    
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
     
     # معالجات الاستدعاء
-    application.add_handler(CallbackQueryHandler(show_balance, pattern='^my_balance$'))
-    application.add_handler(CallbackQueryHandler(buy_numbers_menu, pattern='^buy_numbers$'))
-    application.add_handler(CallbackQueryHandler(show_countries, pattern='^service_'))
-    application.add_handler(CallbackQueryHandler(request_number, pattern='^country_'))
-    application.add_handler(CallbackQueryHandler(get_code, pattern='^get_code_'))
-    application.add_handler(CallbackQueryHandler(cancel_order, pattern='^cancel_'))
-    application.add_handler(CallbackQueryHandler(admin_panel, pattern='^admin_panel$'))
-    application.add_handler(CallbackQueryHandler(main_menu, pattern='^main_menu$'))
+    dp.add_handler(CallbackQueryHandler(show_balance, pattern='^my_balance$'))
+    dp.add_handler(CallbackQueryHandler(buy_numbers_menu, pattern='^buy_numbers$'))
+    dp.add_handler(CallbackQueryHandler(show_countries, pattern='^service_'))
+    dp.add_handler(CallbackQueryHandler(request_number, pattern='^country_'))
+    dp.add_handler(CallbackQueryHandler(get_code, pattern='^get_code_'))
+    dp.add_handler(CallbackQueryHandler(cancel_order, pattern='^cancel_'))
+    dp.add_handler(CallbackQueryHandler(admin_panel, pattern='^admin_panel$'))
+    dp.add_handler(CallbackQueryHandler(main_menu, pattern='^main_menu$'))
     
     # معالجات للوظائف المستقبلية
-    application.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
-                                              pattern='^my_stats$'))
-    application.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
-                                              pattern='^my_orders$'))
-    application.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
-                                              pattern='^admin_stats$'))
-    application.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
-                                              pattern='^admin_users$'))
+    dp.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
+                                      pattern='^my_stats$'))
+    dp.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
+                                      pattern='^my_orders$'))
+    dp.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
+                                      pattern='^admin_stats$'))
+    dp.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
+                                      pattern='^admin_users$'))
     
     # معالج الأخطاء
-    application.add_error_handler(error_handler)
+    dp.add_error_handler(error_handler)
 
 def main():
     """الدالة الرئيسية"""
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("يجب تعيين متغير البيئة TELEGRAM_BOT_TOKEN")
     
-    # إنشاء التطبيق
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    # إنشاء Updater
+    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
     
     # إعداد المعالجات
-    setup_handlers(application)
+    setup_handlers(updater)
     
     # تشغيل البوت
     if WEBHOOK_URL:
-        # وضع Webhook (للاستضافة)
-        from aiohttp import web
-        
-        async def handle_webhook(request):
-            """معالجة طلبات Webhook"""
-            try:
-                data = await request.json()
-                update = Update.de_json(data, application.bot)
-                await application.process_update(update)
-                return web.Response(status=200)
-            except Exception as e:
-                logger.error(f"خطأ في معالجة Webhook: {e}")
-                return web.Response(status=400)
-        
-        async def health_check(request):
-            """فحص صحة الخدمة"""
-            return web.Response(text="✅ البوت يعمل", status=200)
-        
-        # إنشاء تطبيق aiohttp
-        app = web.Application()
-        app.router.add_post('/webhook', handle_webhook)
-        app.router.add_get('/health', health_check)
-        app.router.add_get('/', health_check)
-        
-        # تشغيل عند البدء
-        application.run_webhook(
+        # وضع Webhook
+        updater.start_webhook(
             listen="0.0.0.0",
             port=PORT,
-            webhook_url=f"{WEBHOOK_URL}/webhook",
-            secret_token=None
+            url_path=TELEGRAM_BOT_TOKEN,
+            webhook_url=f"{WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}"
         )
-        
         logger.info(f"🚀 بدء البوت على PORT {PORT} مع Webhook")
-        
     else:
-        # وضع Polling (للتطوير)
+        # وضع Polling
+        updater.start_polling()
         logger.info("🚀 بدء البوت في وضع Polling")
-        application.run_polling()
+    
+    # تشغيل البوت حتى يتم إيقافه
+    updater.idle()
 
 if __name__ == "__main__":
     main()
