@@ -1,4 +1,2 @@
 python-telegram-bot
-requests==2.31.0
-flask[async]
-waitress
+requests
