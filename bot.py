@@ -10,10 +10,7 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-import asyncio
-from http.client import HTTPException
-from sms_activate_api import SMSActivate # ⚠️ تأكد أن اسم الفئة في ملفك هو SMSActivate وليس SMSActivateAPI كما في بعض الأمثلة.
-from sms_activate_api import sms_api, RequestError # استيراد الكائن المُهيأ ودوال معالجة الأخطاء
+from sms_activate_api import sms_api, RequestError # تأكد أن هذا المسار صحيح
 
 # -----------------
 # 1. الإعدادات الأساسية
@@ -29,12 +26,12 @@ TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 WEBHOOK_URL = os.environ.get('WEBHOOK_URL') 
 ADMIN_IDS_STR = os.environ.get('ADMIN_IDS', '8102857570') 
 SMS_ACTIVATE_API_KEY = os.environ.get('SMS_ACTIVATE_API_KEY')
-PORT = int(os.environ.get('PORT', 10000)) # الميناء الموصى به لـ Render
+PORT = int(os.environ.get('PORT', 10000))
 
 try:
     ADMIN_IDS = [int(id.strip()) for id in ADMIN_IDS_STR.split(',')]
 except:
-    ADMIN_IDS = [8102857570]
+    ADMIN_IDS = [81028557570] 
 
 if SMS_ACTIVATE_API_KEY:
     sms_api.api_key = SMS_ACTIVATE_API_KEY
@@ -45,16 +42,12 @@ else:
 SERVICES = {
     'tg': 'تيليجرام 🔵',
     'wa': 'واتساب 🟢', 
-    'vk': 'فكونتاكتي',
-    'ok': 'أودنوكلاسنيكي',
     'fb': 'فيسبوك 🟦',
     'ig': 'انستجرام',
     'tw': 'تويتر',
-    # أضف هنا المزيد من الخدمات التي تريد دعمها
 }
 
-# 💡 قاموس الأعلام: يربط الاسم الروسي (الذي يتم إرجاعه غالبًا من API) برمز العلم الإيموجي
-# *هذا القاموس ضروري لضمان ظهور الأعلام بشكل صحيح*
+# 💡 قاموس الأعلام: يربط الاسم الروسي (الموثوق به من API) برمز العلم الإيموجي
 FLAG_EMOJIS = {
     'Россия': '🇷🇺', 'Украина': '🇺🇦', 'Казахстан': '🇰🇿',
     'Индонезия': '🇮🇩', 'Вьетнам': '🇻🇳', 'Узбекистан': '🇺🇿',
@@ -65,7 +58,7 @@ FLAG_EMOJIS = {
     'Гамбия': '🇬🇲', 'Мозамбик': '🇲🇿', 'Того': '🇹🇬',
     'Сьерра-Леоне': '🇸🇱', 'Ботсвана': '🇧🇼', 'Китай': '🇨🇳',
     'Израиль': '🇮🇱', 'Турция': '🇹🇷', 'السعودية': '🇸🇦',
-    # أضف هنا أي دولة أخرى تظهر لك باللغة الروسية (أو الإنجليزية) مع رمز العلم المقابل
+    'الإمارات': '🇦🇪', 'الأردن': '🇯🇴', 'ليبيا': '🇱🇾',
 }
 
 # قواعد بيانات بسيطة (مؤقتة)
@@ -112,26 +105,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup=reply_markup,
         )
 
+
 async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     user_balance = users_db.get(user_id, {}).get('balance', 0.0)
-
-    try:
-        balance_info = sms_api.get_balance_and_cashback() 
-        api_balance_text = f"• رصيد SMS-Activate: ${balance_info['balance']:.2f}"
-    except RequestError as e:
-        api_balance_text = f"• خطأ في جلب رصيد API: {e.get_api_error_message()}"
-    except Exception:
-        api_balance_text = "• خطأ غير متوقع في الاتصال بـ API."
+    api_balance_text = ""
+    
+    # 💡 التعديل: عرض رصيد API للمشرفين فقط
+    if is_admin(user_id):
+        try:
+            balance_info = sms_api.get_balance_and_cashback() 
+            api_balance_text = f"• رصيد SMS-Activate: ${balance_info['balance']:.2f}\n"
+        except RequestError as e:
+            api_balance_text = f"• خطأ في جلب رصيد API: {e.get_api_error_message()}\n"
+        except Exception:
+            api_balance_text = "• خطأ غير متوقع في الاتصال بـ API.\n"
 
     message = (
         f"💳 **رصيدك الحالي:**\n"
         f"• رصيدك في البوت: ${user_balance:.2f}\n"
-        f"{api_balance_text}\n\n"
-        f"لشحن رصيد البوت، يرجى التواصل مع المالك."
+        f"{api_balance_text}" 
+        f"\nلشحن رصيد البوت، يرجى التواصل مع المالك."
     )
     
     keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='back_to_main')]]
@@ -146,7 +143,6 @@ async def buy_number_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     keyboard = []
     service_codes = list(SERVICES.keys())
     
-    # عرض الخدمات في صفوف ثنائية
     for i in range(0, len(service_codes), 2):
         row = []
         for j in range(2):
@@ -196,14 +192,12 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 if count > 0:
                     
                     country_info = countries_names_data.get(country_id_str, {})
-                    
-                    # 💡 المنطق المعدل لترتيب الأولوية للأسماء العربية
                     country_name_rus = country_info.get('rus', f'Country-{country_id_str}')
                     
-                    # نستخدم 'arab' إن وجد، أو نعتمد على 'rus' كبديل أساسي
+                    # 💡 المنطق: الأولوية للغة العربية
                     country_name_display = country_info.get('arab') or country_name_rus
                     
-                    # 💡 استخراج رمز العلم بالاعتماد على الاسم الروسي (المفتاح الموثوق في القاموس)
+                    # 💡 استخراج رمز العلم بالاعتماد على الاسم الروسي
                     flag = FLAG_EMOJIS.get(country_name_rus, '❓')
                     
                     available_countries.append({
@@ -214,7 +208,6 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
                         'flag': flag
                     })
 
-        # فرز حسب السعر (من الأرخص إلى الأغلى)
         sorted_countries = sorted(available_countries, key=lambda c: c['price'])
         
     except RequestError as e:
@@ -225,7 +218,6 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
          await query.edit_message_text(f"❌ حدث خطأ غير متوقع أثناء جلب الدول.")
          return
     
-    # 💡 منطق تقسيم وعرض الدول (Pagination)
     countries_per_page = 24
     start_index = current_page * countries_per_page
     end_index = start_index + countries_per_page
@@ -233,7 +225,6 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     keyboard = []
     
-    # تنسيق الأزرار (صفين)
     for i in range(0, len(countries_to_display), 2):
         row = []
         for j in range(2):
@@ -241,7 +232,6 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 country_data = countries_to_display[i + j]
                 country_id_str = country_data['id']
                 
-                # 💡 استخدام العلم والاسم العربي
                 button_text = f"{country_data['flag']} {country_data['name']} | ${country_data['price']:.2f} ({country_data['count']})"
                 callback_data = f"request_{service_code}_{country_id_str}"
                 row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
@@ -249,7 +239,6 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if row:
             keyboard.append(row)
     
-    # أزرار التنقل
     nav_buttons = []
     if current_page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"service_{service_code}_{current_page - 1}"))
@@ -268,9 +257,7 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode='Markdown'
     )
 
-
 async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (بقية الدالة تبقى كما هي: طلب الرقم)
     query = update.callback_query
     await query.answer("جاري طلب رقمك...", show_alert=True)
     
@@ -317,7 +304,6 @@ async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (بقية الدالة تبقى كما هي: جلب الكود)
     query = update.callback_query
     await query.answer("جاري التحقق من الكود...", show_alert=False)
     
@@ -365,7 +351,6 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await query.edit_message_text(f"❌ حدث خطأ في جلب الكود: {e.get_api_error_message()}")
 
 async def cancel_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (بقية الدالة تبقى كما هي: إلغاء الطلب)
     query = update.callback_query
     await query.answer("جاري إلغاء الطلب...", show_alert=True)
     
@@ -387,8 +372,33 @@ async def cancel_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except RequestError as e:
         await query.edit_message_text(f"❌ حدث خطأ في الإلغاء: {e.get_api_error_message()}")
 
+
+async def show_account_record(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    user_orders = [order for order in orders_db.values() if order['user_id'] == user_id]
+    
+    if user_orders:
+        message = "**سجل طلباتك الأخيرة:**\n\n"
+        for i, order in enumerate(user_orders[-5:]): 
+            message += (
+                f"**{i+1}.** **الرقم:** `{order['phone_number']}`\n"
+                f"   **الخدمة:** {SERVICES.get(order.get('service_code'), 'غير معروف')}\n"
+                f"   **الحالة:** {order['status']}\n"
+                f"   **الكود:** {order.get('code', 'لم يصل')}\n\n"
+            )
+        keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='back_to_main')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+    else:
+        keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='back_to_main')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("لا توجد سجلات لعمليات شراء سابقة في حسابك.", reply_markup=reply_markup)
+
 # -----------------
-# 3. دوال التنقل والمشرفين (تبقى كما هي تقريباً)
+# 3. دوال التنقل والمشرفين
 # -----------------
 
 async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -397,7 +407,6 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await start(update, context)
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (كود لوحة المشرفين)
     query = update.callback_query
     await query.answer()
 
@@ -434,13 +443,18 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def handle_static_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (كود الأزرار غير المفعّلة)
     query = update.callback_query
     await query.answer("هذه الميزة قيد التطوير.")
-
+    
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (معالج رسائل المشرفين)
-    pass # هنا يجب أن يكون منطق معالجة رسائل المشرفين (مثل أمر الشحن)
+    # لتجنب إرسال رد على أوامر المشرف النصية
+    if update.effective_user.id in ADMIN_IDS and update.message.text.lower().startswith('شحن'):
+        # هنا يجب أن يكون منطق معالجة رسائل المشرفين (مثل أمر الشحن)
+        pass 
+    else:
+        await update.message.reply_text(
+            "يرجى استخدام الأزرار في القائمة للتفاعل مع البوت.\nاكتب /start لعرض القائمة الرئيسية."
+        )
 
 # -----------------
 # 4. الدالة الرئيسية (Main)
@@ -455,10 +469,11 @@ def main() -> None:
     
     # === Handlers ===
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Chat(ADMIN_IDS), lambda u, c: u.message.reply_text("يرجى استخدام الأزرار في القائمة. /start")))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # المستخدم
-    application.add_handler(CallbackQueryHandler(show_balance, pattern='^my_balance$|^Payment$'))
+    application.add_handler(CallbackQueryHandler(show_balance, pattern='^my_balance$'))
+    application.add_handler(CallbackQueryHandler(show_account_record, pattern='^Record$'))
     application.add_handler(CallbackQueryHandler(buy_number_menu, pattern='^Buynum$'))
     application.add_handler(CallbackQueryHandler(get_countries_menu, pattern=r'^service_[a-z]{2}(_\d+)?$')) 
     application.add_handler(CallbackQueryHandler(request_number, pattern=r'^request_[a-z]{2}_\d+$'))
@@ -468,15 +483,16 @@ def main() -> None:
     # المشرفين والتنقل
     application.add_handler(CallbackQueryHandler(back_to_main, pattern='^back_to_main$'))
     application.add_handler(CallbackQueryHandler(admin_panel, pattern='^admin_panel$'))
-    application.add_handler(CallbackQueryHandler(handle_static_buttons, pattern='^sh$|^Wo$|^worldwide$|^saavmotamy$|^assignment$|^readycard-10$|^ready$|^Record$|^admin_charge$|^admin_orders_log$'))
+    application.add_handler(CallbackQueryHandler(handle_static_buttons, pattern='^sh$|^Wo$|^worldwide$|^saavmotamy$|^assignment$|^readycard-10$|^ready$|^admin_charge$|^admin_orders_log$'))
     
-    # 💡 تشغيل الـ Webhook
+    # 💡 تشغيل الـ Webhook (تم تصحيح 'url_path')
     webhook_path = f"/{TELEGRAM_BOT_TOKEN}" 
     
     application.run_webhook(
         listen="0.0.0.0", 
         port=PORT,
-        urlpath=TELEGRAM_BOT_TOKEN, # مسار التوكن لحماية الـ Webhook
+        # 🟢 تم تصحيح الخطأ: تغيير 'urlpath' إلى 'url_path'
+        url_path=TELEGRAM_BOT_TOKEN, 
         webhook_url=f"{WEBHOOK_URL}{webhook_path}"
     )
 
