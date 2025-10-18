@@ -1,5 +1,6 @@
 import os
 import logging
+import re # 💡 تم استيراد المكتبة للتعامل مع تحليل الأمر
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -10,7 +11,6 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-# تأكد من أن ملف sms_activate_api.py موجود
 from sms_activate_api import sms_api, RequestError
 
 # -----------------
@@ -142,7 +142,7 @@ COUNTRY_TRANSLATIONS = {
     "Fiji": ('🇫🇯', 'فيجي'), "Singapore": ('🇸🇬', 'سنغافورة'),
     "Malta": ('🇲🇹', 'مالطا'), "Gibraltar": ('🇬🇮', 'جبل طارق'),
     "Kosovo": ('🇽🇰', 'كوسوفو'), "Niue": ('🇳🇺', 'نيوي'),
-    "Russia": ('🇷🇺', 'روسيا'), # إضافة روسيا لأنها قد تكون موجودة بالاسم الإنجليزي
+    "Russia": ('🇷🇺', 'روسيا'), 
 }
 
 # قواعد بيانات بسيطة (مؤقتة)
@@ -419,7 +419,6 @@ async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (get_code - لا تغيير جوهري)
     query = update.callback_query
     await query.answer("جاري التحقق من الكود...", show_alert=False)
     
@@ -579,9 +578,9 @@ async def admin_charge_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE
     message = (
         "💰 **نظام شحن الرصيد:**\n\n"
         "يرجى إرسال أمر الشحن بالتنسيق التالي:\n"
-        "`/شحن [معرف المستخدم] [المبلغ بالدولار]`\n\n"
+        "**/charge [معرف المستخدم] [المبلغ بالدولار]**\n\n"
         "**مثال:** لشحن 5.50$ للمستخدم الذي معرفه 123456789\n"
-        "`/شحن 123456789 5.50`"
+        "`/charge 123456789 5.50`"
     )
     keyboard = [[InlineKeyboardButton('🔙 لوحة المشرفين', callback_data='admin_panel')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -589,16 +588,16 @@ async def admin_charge_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def admin_charge_process(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # يتم استدعاء هذه الدالة عبر الأمر النصي /شحن
+    # يتم استدعاء هذه الدالة عبر الأمر النصي /charge
     
     if not is_admin(update.effective_user.id):
         return
 
     try:
-        # /شحن 123456789 5.50
+        # /charge 123456789 5.50
         args = context.args
         if len(args) != 2:
-            await update.message.reply_text("⚠️ تنسيق الأمر غير صحيح. استخدم: `/شحن [معرف المستخدم] [المبلغ]`", parse_mode='Markdown')
+            await update.message.reply_text("⚠️ تنسيق الأمر غير صحيح. استخدم: `/charge [معرف المستخدم] [المبلغ]`", parse_mode='Markdown')
             return
 
         target_user_id = int(args[0])
@@ -648,13 +647,23 @@ async def handle_static_buttons(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer("هذه الميزة قيد التطوير.")
     
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # لمنع الرد على أوامر المشرف التي تبدأ بـ /شحن
-    if update.effective_user.id in ADMIN_IDS and update.message.text.lower().startswith('/شحن'):
+    # لمنع الرد على أوامر المشرف التي تبدأ بـ /start أو /charge
+    if update.effective_user.id in ADMIN_IDS and update.message.text.lower().startswith('/charge'):
         return 
-    else:
+    
+    # 💡 التحقق من الأوامر العربية (شحن) وإعطاء رسالة خطأ واضحة
+    if update.message.text.lower().startswith('/شحن') and is_admin(update.effective_user.id):
         await update.message.reply_text(
-            "يرجى استخدام الأزرار في القائمة للتفاعل مع البوت.\nاكتب /start لعرض القائمة الرئيسية."
+            "⚠️ **تنبيه:** لقد تم تغيير أمر الشحن.\n"
+            "يرجى استخدام الأمر الجديد: `/charge`\n"
+            "التنسيق: `/charge [معرف المستخدم] [المبلغ]`", 
+            parse_mode='Markdown'
         )
+        return
+        
+    await update.message.reply_text(
+        "يرجى استخدام الأزرار في القائمة للتفاعل مع البوت.\nاكتب /start لعرض القائمة الرئيسية."
+    )
 
 # -----------------
 # 4. الدالة الرئيسية (Main)
@@ -669,7 +678,8 @@ def main() -> None:
     
     # === Handlers ===
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("شحن", admin_charge_process)) # أمر الشحن للمشرفين
+    # 💡 تم تغيير الأمر إلى /charge لتجنب خطأ الأحرف غير اللاتينية
+    application.add_handler(CommandHandler("charge", admin_charge_process)) 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # المستخدم
@@ -687,7 +697,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(admin_charge_prompt, pattern='^admin_charge_prompt$')) # توجيه الشحن
     application.add_handler(CallbackQueryHandler(handle_static_buttons, pattern='^sh$|^Wo$|^worldwide$|^saavmotamy$|^assignment$|^readycard-10$|^ready$'))
     
-    # 💡 تشغيل الـ Webhook (تم تصحيح 'url_path')
+    # 💡 تشغيل الـ Webhook
     webhook_path = f"/{TELEGRAM_BOT_TOKEN}" 
     
     application.run_webhook(
