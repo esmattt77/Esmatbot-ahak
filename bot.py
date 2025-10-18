@@ -56,7 +56,7 @@ SERVICES = {
 users_db = {}
 orders_db = {}
 
-# ========== دوال البوت (نفس الكود السابق) ==========
+# ========== دوال البوت ==========
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -339,7 +339,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "يرجى استخدام الأزرار في القائمة للتفاعل مع البوت.\nاكتب /start لعرض القائمة الرئيسية."
     )
 
-async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(f"حدث خطأ: {context.error}")
 
 # ========== إعدادات Webhook ==========
@@ -357,11 +357,6 @@ async def on_startup(application: Application):
     """تشغيل عند بدء التطبيق"""
     await set_webhook(application)
     logger.info("✅ البوت يعمل باستخدام Webhooks")
-
-async def on_shutdown(application: Application):
-    """تشغيل عند إيقاف التطبيق"""
-    await application.bot.delete_webhook()
-    logger.info("✅ تم إيقاف Webhook")
 
 def setup_handlers(application: Application):
     """إعداد معالجات البوت"""
@@ -406,7 +401,6 @@ def main():
     if WEBHOOK_URL:
         # وضع Webhook (للاستضافة)
         from aiohttp import web
-        import ssl
         
         async def handle_webhook(request):
             """معالجة طلبات Webhook"""
@@ -429,8 +423,15 @@ def main():
         app.router.add_get('/health', health_check)
         app.router.add_get('/', health_check)
         
+        # تشغيل عند البدء
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            webhook_url=f"{WEBHOOK_URL}/webhook",
+            secret_token=None
+        )
+        
         logger.info(f"🚀 بدء البوت على PORT {PORT} مع Webhook")
-        web.run_app(app, host='0.0.0.0', port=PORT)
         
     else:
         # وضع Polling (للتطوير)
