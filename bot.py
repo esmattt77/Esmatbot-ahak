@@ -10,7 +10,7 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-from sms_activate_api import sms_api, RequestError # تأكد أن هذا المسار صحيح
+from sms_activate_api import sms_api, RequestError
 
 # -----------------
 # 1. الإعدادات الأساسية
@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# المتغيرات الأساسية (تُجلب من متغيرات البيئة في Render)
+# متغيرات البيئة
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 WEBHOOK_URL = os.environ.get('WEBHOOK_URL') 
 ADMIN_IDS_STR = os.environ.get('ADMIN_IDS', '8102857570') 
@@ -35,10 +35,8 @@ except:
 
 if SMS_ACTIVATE_API_KEY:
     sms_api.api_key = SMS_ACTIVATE_API_KEY
-else:
-    logger.warning("SMS_ACTIVATE_API_KEY غير مُعين.")
 
-# قاموس الخدمات (للعرض في القائمة)
+# قاموس الخدمات
 SERVICES = {
     'tg': 'تيليجرام 🔵',
     'wa': 'واتساب 🟢', 
@@ -47,18 +45,43 @@ SERVICES = {
     'tw': 'تويتر',
 }
 
-# 💡 قاموس الأعلام: يربط الاسم الروسي (الموثوق به من API) برمز العلم الإيموجي
-FLAG_EMOJIS = {
-    'Россия': '🇷🇺', 'Украина': '🇺🇦', 'Казахстан': '🇰🇿',
-    'Индонезия': '🇮🇩', 'Вьетнам': '🇻🇳', 'Узбекистан': '🇺🇿',
-    'Зимбабве': '🇿🇼', 'Мавритания': '🇲🇷', 'Белиз': '🇧🇿',
-    'Гвинея-Бисау': '🇬🇼', 'Лесото': '🇱🇸', 'Малави': '🇲🇼',
-    'Руанда': '🇷🇼', 'Филиппины': '🇵🇭', 'Танзания': '🇹🇿',
-    'Египет': '🇪🇬', 'Монголия': '🇲🇳', 'Марокко': '🇲🇦',
-    'Гамбия': '🇬🇲', 'Мозамбик': '🇲🇿', 'Того': '🇹🇬',
-    'Сьерра-Леоне': '🇸🇱', 'Ботсвана': '🇧🇼', 'Китай': '🇨🇳',
-    'Израиль': '🇮🇱', 'Турция': '🇹🇷', 'السعودية': '🇸🇦',
-    'الإمارات': '🇦🇪', 'الأردن': '🇯🇴', 'ليبيا': '🇱🇾',
+# 💡 قاموس ترجمة روسي-عربي مع الأعلام
+# يستخدم لترجمة الاسم الروسي الثابت من API إلى اسم عربي.
+COUNTRY_TRANSLATIONS = {
+    'Россия': ('🇷🇺', 'روسيا'),
+    'Украина': ('🇺🇦', 'أوكرانيا'),
+    'Казахстан': ('🇰🇿', 'كازاخستان'),
+    'Индонезия': ('🇮🇩', 'إندونيسيا'),
+    'Вьетнам': ('🇻🇳', 'فيتنام'),
+    'Узбекистан': ('🇺🇿', 'أوزبكستان'),
+    'Зимбабве': ('🇿🇼', 'زيمبابوي'),
+    'Мавритания': ('🇲🇷', 'موريتانيا'),
+    'Белиз': ('🇧🇿', 'بليز'),
+    'Гвинея-Бисау': ('🇬🇼', 'غينيا بيساو'),
+    'Лесото': ('🇱🇸', 'ليسوتو'),
+    'Малави': ('🇲🇼', 'مالاوي'),
+    'Руанда': ('🇷🇼', 'رواندا'),
+    'Филиппины': ('🇵🇭', 'الفلبين'),
+    'Танзания': ('🇹🇿', 'تنزانيا'),
+    'Египет': ('🇪🇬', 'مصر'),
+    'Монголия': ('🇲🇳', 'منغوليا'),
+    'Марокко': ('🇲🇦', 'المغرب'),
+    'Гамбия': ('🇬🇲', 'غامبيا'),
+    'Мозамбик': ('🇲🇿', 'موزمبيق'),
+    'Того': ('🇹🇬', 'توجو'),
+    'Сьерра-Леоне': ('🇸🇱', 'سيراليون'),
+    'Ботсвана': ('🇧🇼', 'بوتسوانا'),
+    'Китай': ('🇨🇳', 'الصين'),
+    'Израиль': ('🇮🇱', 'إسرائيل'),
+    'Турция': ('🇹🇷', 'تركيا'),
+    # الدول العربية المحتملة (لتأكيد ظهورها بالعربية حتى لو لم تكن في المفتاح 'arab')
+    'Саудовская Аравия': ('🇸🇦', 'السعودية'),
+    'Объединенные Арабские Эмираты': ('🇦🇪', 'الإمارات'),
+    'Иордания': ('🇯🇴', 'الأردن'),
+    'Ливия': ('🇱🇾', 'ليبيا'),
+    'Ирак': ('🇮🇶', 'العراق'),
+    'Йемен': ('🇾🇪', 'اليمن'),
+    'Сирия': ('🇸🇾', 'سوريا'),
 }
 
 # قواعد بيانات بسيطة (مؤقتة)
@@ -194,11 +217,16 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     country_info = countries_names_data.get(country_id_str, {})
                     country_name_rus = country_info.get('rus', f'Country-{country_id_str}')
                     
-                    # 💡 المنطق: الأولوية للغة العربية
-                    country_name_display = country_info.get('arab') or country_name_rus
+                    # 💡 المنطق الجديد: الترجمة القسرية عبر القاموس الثابت
+                    translation_info = COUNTRY_TRANSLATIONS.get(country_name_rus)
                     
-                    # 💡 استخراج رمز العلم بالاعتماد على الاسم الروسي
-                    flag = FLAG_EMOJIS.get(country_name_rus, '❓')
+                    if translation_info:
+                        # استخدام الاسم المترجم والعلم من القاموس
+                        flag, country_name_display = translation_info
+                    else:
+                        # في حالة عدم وجود ترجمة، نحاول استخدام 'arab' أو نرجع للاسم الروسي
+                        country_name_display = country_info.get('arab') or country_name_rus
+                        flag = '❓'
                     
                     available_countries.append({
                         'id': country_id_str,
@@ -266,8 +294,6 @@ async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     service_code = data[1]
     country_id = int(data[2])
     
-    # 💡 [ملاحظة]: يجب هنا إضافة منطق خصم الرصيد من users_db
-    
     try:
         number_info = sms_api.get_number(service_code, country_id)
         
@@ -319,7 +345,7 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         code = status_info.get('code')
         
         if status == 'STATUS_OK' and code:
-            sms_api.set_status(request_id, 6) # 💡 تأكيد الكود (الحالة 6 = ACCESS_FINISH)
+            sms_api.set_status(request_id, 6) 
             
             orders_db[request_id]['status'] = 'completed'
             orders_db[request_id]['code'] = code
@@ -331,7 +357,7 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 parse_mode='Markdown'
             )
         elif status in ['STATUS_WAIT_CODE', 'STATUS_WAIT_RETRY']:
-            sms_api.set_status(request_id, 3) # 💡 طلب إرسال الكود مرة أخرى (الحالة 3 = ACCESS_READY)
+            sms_api.set_status(request_id, 3) 
             
             keyboard = [
                 [InlineKeyboardButton('🔄 تحديث ومحاولة', callback_data=f'get_code_{request_id}')],
@@ -361,7 +387,7 @@ async def cancel_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     try:
-        sms_api.set_status(request_id, 8) # 💡 استخدام set_status للإلغاء (8 = ACCESS_CANCEL)
+        sms_api.set_status(request_id, 8) 
         
         orders_db[request_id]['status'] = 'cancelled'
         
@@ -447,9 +473,7 @@ async def handle_static_buttons(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer("هذه الميزة قيد التطوير.")
     
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # لتجنب إرسال رد على أوامر المشرف النصية
     if update.effective_user.id in ADMIN_IDS and update.message.text.lower().startswith('شحن'):
-        # هنا يجب أن يكون منطق معالجة رسائل المشرفين (مثل أمر الشحن)
         pass 
     else:
         await update.message.reply_text(
@@ -491,8 +515,7 @@ def main() -> None:
     application.run_webhook(
         listen="0.0.0.0", 
         port=PORT,
-        # 🟢 تم تصحيح الخطأ: تغيير 'urlpath' إلى 'url_path'
-        url_path=TELEGRAM_BOT_TOKEN, 
+        url_path=TELEGRAM_BOT_TOKEN, # تم تصحيح الخطأ: يجب أن يكون url_path
         webhook_url=f"{WEBHOOK_URL}{webhook_path}"
     )
 
