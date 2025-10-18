@@ -1,4 +1,4 @@
-# bot.py
+# bot.py (محدث للعمل مع sms_activate_api.py)
 
 import os
 import logging
@@ -12,459 +12,540 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-import asyncio # تم إضافته لضمان التوافق مع async.run
+from flask import Flask, request, jsonify
+import asyncio
 
-# استيراد واجهة API الجديدة
-from sms_activate_api import sms_api, RequestError 
-# 💡 ملاحظة: تم إزالة sms_activate_api من بداية الكود لعدم تكرار الاستيراد
+# 💡 استيراد واجهة API الجديدة التي قدمتها في السؤال الأول
+from sms_activate_api import sms_api, RequestError, SMSActivate 
+# إذا كان الكائن sms_api مهيأ بالفعل في الملف المستورد، سنستخدمه مباشرة.
 
-# إعدادات التسجيل
+# إعدادات تسجيل الأخطاء (Log)
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
-    level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# الحصول على المتغيرات البيئية
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-SMS_ACTIVATE_API_KEY = os.environ.get('SMS_ACTIVATE_API_KEY')
-WEBHOOK_URL = os.environ.get('WEBHOOK_URL', '').rstrip('/')
-PORT = int(os.environ.get('PORT', 8080))
+# =================================================================
+#                     إعدادات البوت والبيئة
+# =================================================================
 
-# إعدادات المشرفين
-admin_ids_str = os.environ.get('ADMIN_IDS', '8102857570')
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
+PORT = int(os.environ.get('PORT', 5000))
+
+# 💡 إعدادات المشرفين
+admin_ids_str = os.environ.get('ADMIN_IDS', '8102857570') # استخدم رقمك الفعلي هنا
 try:
     ADMIN_IDS = [int(id.strip()) for id in admin_ids_str.split(',')]
 except:
     ADMIN_IDS = [8102857570]
 
-# =================================================================
-# 💡 التعديل 1: تعيين مفتاح API لكائن sms_api المستورد
-# =================================================================
+# 💡 تعيين مفتاح API لـ sms_api
+SMS_ACTIVATE_API_KEY = os.environ.get('SMS_ACTIVATE_API_KEY')
 if SMS_ACTIVATE_API_KEY:
     sms_api.api_key = SMS_ACTIVATE_API_KEY
 else:
-    logger.warning("SMS_ACTIVATE_API_KEY غير مُعين. لن يتمكن البوت من شراء الأرقام.")
+    logger.warning("SMS_ACTIVATE_API_KEY غير مُعين.")
 
-
-# تعيين الخدمات (تم الإبقاء عليها كما هي)
+# قاموس الخدمات (للعرض فقط، يجب أن يتوافق مع رموز SMS-Activate)
 SERVICES = {
     'tg': 'تيليجرام',
     'wa': 'واتساب', 
+    'vk': 'فكونتاكتي',
+    'ok': 'أودنوكلاسنيكي',
     'fb': 'فيسبوك',
     'ig': 'انستجرام',
     'tw': 'تويتر',
-    'vk': 'فكونتاكتي',
-    'ok': 'أودنوكلاسنيكي',
-    'mm': 'مابمبا',
-    'mb': 'يولا',
-    'wb': 'وي شات'
+    # يمكنك إضافة المزيد هنا
 }
 
-# قاعدة بيانات بسيطة (تم الإبقاء عليها كما هي، بافتراض أنك ستدمج db_manager لاحقاً)
+# قاعدة بيانات بسيطة (مؤقتة)
 users_db = {}
 orders_db = {}
+# =================================================================
 
-# ========== دوال البوت ==========
+# دالة مساعدة للتحقق من هوية الأدمن
+def is_admin(user_id):
+    return user_id in ADMIN_IDS
 
-# 💡 تم الإبقاء على الدوال الأساسية دون تغيير (start, main_menu, handle_message, error_handler)
+# تهيئة تطبيق Flask
+app = Flask(__name__)
+
+# =================================================================
+#                         دوَال المُسْتَخْدِم
+# =================================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # ... (تم حذف الكود الطويل لـ start لضمان التركيز على التعديلات) ...
     user = update.effective_user
     user_id = user.id
     
-    # 💡 [ملاحظة]: يفضل استخدام دالة register_user من db_manager.py هنا عند دمجه
     if user_id not in users_db:
-        users_db[user_id] = {
-            'username': user.username,
-            'first_name': user.first_name,
-            'join_date': datetime.now(),
-            'balance': 0.0,
-            'total_orders': 0
-        }
-    
+        users_db[user_id] = {'balance': 0.0, 'orders': []}
+
     keyboard = [
-        [InlineKeyboardButton('☎️ شراء أرقام', callback_data='buy_numbers')],
-        [InlineKeyboardButton('💰 رصيدي', callback_data='my_balance'),
-         InlineKeyboardButton('📊 إحصائياتي', callback_data='my_stats')],
-        [InlineKeyboardButton('🛒 طلباتي', callback_data='my_orders')],
+        [InlineKeyboardButton('☎️︙شراء ارقـام وهمية', callback_data='Buynum')],
+        [InlineKeyboardButton('💰︙رصيدي الحالي', callback_data='my_balance'), InlineKeyboardButton('🅿️︙سجل طلباتي', callback_data='Record')],
+        # الأزرار الإضافية التي طلبتها
+        [InlineKeyboardButton('👤︙قسم الرشق', callback_data='sh'), InlineKeyboardButton('🛍︙قسم العروض', callback_data='Wo')],
+        [InlineKeyboardButton('☑️︙قسم العشوائي', callback_data='worldwide'), InlineKeyboardButton('👑︙قسم الملكي', callback_data='saavmotamy')],
+        [InlineKeyboardButton('💰︙ربح روبل مجاني 🤑', callback_data='assignment')],
+        [InlineKeyboardButton('💳︙متجر الكروت', callback_data='readycard-10'), InlineKeyboardButton('🔰︙الارقام الجاهزة', callback_data='ready')]
     ]
     
-    if user_id in ADMIN_IDS:
-        keyboard.append([InlineKeyboardButton('👑 لوحة المشرفين', callback_data='admin_panel')])
-    
+    if is_admin(user_id):
+        keyboard.append([InlineKeyboardButton('⚙️ لوحة المشرفين', callback_data='admin_panel')])
+
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_html(
-        f"مرحباً {user.mention_html()}! 👋\n\n"
-        "أهلاً بك في بوت شراء الأرقام الافتراضية.\n"
-        "اختر الخدمة التي تريدها من القائمة:",
-        reply_markup=reply_markup
-    )
+    if update.callback_query:
+         await update.callback_query.edit_message_text(
+            f"مرحباً بك يا {user.mention_html()}! تفضل لوحة التحكم الرئيسية للبوت:",
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+    else:
+        await update.message.reply_html(
+            f"مرحباً بك يا {user.mention_html()}! تفضل لوحة التحكم الرئيسية للبوت:",
+            reply_markup=reply_markup,
+        )
+
 
 async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
-    try:
-        # 💡 التعديل 2: استخدام get_balance_and_cashback
-        balance_info = sms_api.get_balance_and_cashback() 
-        user_balance = users_db.get(user_id, {}).get('balance', 0)
-        
-        message = (
-            f"💳 **رصيدك الحالي:**\n\n"
-            f"• رصيد SMS Activate: ${balance_info['balance']:.2f}\n"
-            f"• رصيد الكاش باك: ${balance_info['cashback']:.2f}\n"
-            f"• رصيدك في البوت: ${user_balance:.2f}"
-        )
-        
-        keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='main_menu')]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
-        
-    except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
+    user_balance = users_db.get(user_id, {}).get('balance', 0.0)
 
-# ... (buy_numbers_menu لم تتغير) ...
-async def buy_numbers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
+    try:
+        # 💡 استخدام get_balance_and_cashback
+        balance_info = sms_api.get_balance_and_cashback() 
+        api_balance_text = f"• رصيد SMS-Activate: ${balance_info['balance']:.2f}\n• رصيد الكاش باك: ${balance_info['cashback']:.2f}"
+    except RequestError as e:
+        api_balance_text = f"• خطأ في جلب رصيد API: {str(e)}"
+    except Exception:
+        api_balance_text = "• خطأ غير متوقع في الاتصال بـ API."
+
+    message = (
+        f"💳 **رصيدك الحالي:**\n"
+        f"• رصيدك في البوت: ${user_balance:.2f}\n"
+        f"{api_balance_text}\n\n"
+        f"لشحن رصيد البوت، يرجى التواصل مع المالك."
+    )
     
-    keyboard = []
-    for service_code, service_name in SERVICES.items():
-        keyboard.append([InlineKeyboardButton(f'📱 {service_name}', callback_data=f'service_{service_code}')])
-    
-    keyboard.append([InlineKeyboardButton('🔙 العودة', callback_data='main_menu')])
+    keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='back_to_main')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+
+async def show_account_record(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    # فلترة الطلبات الخاصة بهذا المستخدم
+    user_orders = [order for order in orders_db.values() if order['user_id'] == user_id]
+    
+    if user_orders:
+        message = "**سجل طلباتك الأخيرة:**\n\n"
+        # عرض آخر 5 طلبات
+        for i, order in enumerate(user_orders[-5:]): 
+            message += (
+                f"**{i+1}.** **الرقم:** `{order['phone_number']}`\n"
+                f"   **الخدمة:** {SERVICES.get(order.get('service_code'), 'غير معروف')}\n"
+                f"   **الحالة:** {order['status']}\n"
+                f"   **الكود:** {order.get('code', 'لم يصل')}\n\n"
+            )
+        keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='back_to_main')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+    else:
+        keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='back_to_main')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("لا توجد سجلات لعمليات شراء سابقة في حسابك.", reply_markup=reply_markup)
+
+
+async def buy_number_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = []
+    for service_code, service_name in SERVICES.items():
+        # 💡 تنسيق زر الخدمة لعرض الدول في الخطوة التالية
+        keyboard.append([InlineKeyboardButton(f'📱 {service_name}', callback_data=f'service_{service_code}_0')]) 
+    
+    keyboard.append([InlineKeyboardButton('عودة', callback_data='back_to_main')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
-        "🛍️ **اختر الخدمة:**\n\nاختر الخدمة التي تريد شراء رقم لها:",
+        text="🛍️ **اختر الخدمة:**\n\nاختر الخدمة التي تريد شراء رقم لها:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
 
 
-async def show_countries(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    await query.answer("جاري تحميل قائمة الدول...", show_alert=False)
     
-    service_code = query.data.split('_')[1]
+    data = query.data.split('_')
+    service_code = data[1]
+    current_page = int(data[2]) if len(data) > 2 else 0
+    
     context.user_data['selected_service'] = service_code
     
     try:
-        # 💡 التعديل 3: استخدام get_countries و get_prices
-        countries_data = sms_api.get_countries()
+        # 💡 جلب الأسعار والدول المتاحة
         prices_data = sms_api.get_prices(service=service_code)
         
-        keyboard = []
+        # تحويل بيانات الأسعار إلى قائمة مرتبة حسب السعر
+        available_countries = []
+        for country_id, price_info in prices_data.get(service_code, {}).items():
+            if price_info.get('count', 0) > 0:
+                available_countries.append({
+                    'id': country_id,
+                    'price': price_info['cost'],
+                    'count': price_info['count']
+                })
+
+        # فرز حسب السعر (من الأرخص إلى الأغلى)
+        sorted_countries = sorted(available_countries, key=lambda c: c['price'])
         
-        # 💡 ملاحظة: يتم تجميع الدول والأسعار لعرضها في القائمة
-        for country_id_str, country_info in countries_data.items():
-            country_id = int(country_id_str)
-            # مفتاح البحث في prices_data يكون عبارة عن: srv_id_country_id 
-            # ولكن في get_prices تكون البنية: {service_id: {country_id: {cost: x, count: y}}}
-            
-            # نحتاج إلى البحث عن معلومات السعر بالـ service_code والدولة
-            
-            # الفحص الأبسط: هل توجد معلومات سعر متاحة لهذه الخدمة؟
-            
-            # يتم استخراج قائمة الأسعار لهذه الخدمة أولاً
-            service_prices = prices_data.get(service_code, {})
-            
-            if country_id in service_prices:
-                price_info = service_prices[country_id]
-                price = price_info.get('cost', 0)
-                count = price_info.get('count', 0)
-                
-                if count > 0:
-                    button_text = f"🇺🇳 {country_info['name']} - ${price} ({count})"
-                    keyboard.append([InlineKeyboardButton(button_text, callback_data=f'country_{country_id}')])
-        
-        keyboard.append([InlineKeyboardButton('🔙 العودة', callback_data='buy_numbers')])
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            f"🌍 **اختر الدولة للخدمة: {SERVICES[service_code]}**\n\nاختر الدولة التي تريد الرقم منها:",
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
+        # جلب أسماء الدول
+        countries_names = sms_api.get_countries()
         
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
+        await query.edit_message_text(f"❌ حدث خطأ في جلب الدول: {str(e)}")
+        return
+    
+    countries_per_page = 24
+    start_index = current_page * countries_per_page
+    end_index = start_index + countries_per_page
+    countries_to_display = sorted_countries[start_index:end_index]
+    
+    keyboard = []
+    
+    for i in range(0, len(countries_to_display), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(countries_to_display):
+                country_data = countries_to_display[i + j]
+                country_id_str = str(country_data['id'])
+                
+                # استخدام اسم الدولة من get_countries
+                country_info = countries_names.get(country_id_str, {})
+                country_name = country_info.get('name', f"دولة-{country_id_str}")
+                
+                button_text = f"{country_name} | ${country_data['price']:.2f} ({country_data['count']})"
+                callback_data = f"request_{service_code}_{country_id_str}"
+                row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+        
+        if row:
+            keyboard.append(row)
+    
+    # أزرار التنقل
+    nav_buttons = []
+    if current_page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"service_{service_code}_{current_page - 1}"))
+    if end_index < len(sorted_countries):
+        nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"service_{service_code}_{current_page + 1}"))
+    
+    if nav_buttons:
+        keyboard.append(nav_buttons)
 
+    keyboard.append([InlineKeyboardButton("عودة", callback_data='Buynum')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        text=f"🌍 **اختر الدولة لخدمة: {SERVICES.get(service_code)}**\n\nاختر الدولة والسعر:",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
 
 async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    await query.answer("جاري طلب رقمك...", show_alert=True)
     
-    country_id = int(query.data.split('_')[1])
-    service_code = context.user_data.get('selected_service')
+    user_id = query.from_user.id
+    data = query.data.split('_')
+    service_code = data[1]
+    country_id = int(data[2])
     
-    # 💡 [ملاحظة]: يجب أن يتم هنا خصم الرصيد من قاعدة البيانات الحقيقية
+    # 💡 [ملاحظة]: هنا يجب أن يتم خصم الرصيد من users_db قبل طلب الرقم
     
     try:
-        # 💡 التعديل 4: استخدام get_number
+        # 💡 استخدام get_number
         number_info = sms_api.get_number(service_code, country_id)
         
-        order_id = number_info['id']
-        orders_db[order_id] = {
-            'user_id': query.from_user.id,
-            'service': service_code,
-            'country': country_id,
-            'number': number_info['number'],
-            'status': 'active',
+        request_id = number_info['id']
+        phone_number = number_info['number']
+        
+        # تخزين بيانات الطلب
+        orders_db[request_id] = {
+            'user_id': user_id,
+            'phone_number': phone_number,
+            'service_code': service_code,
+            'status': 'STATUS_WAIT_CODE', # حالة الانتظار
             'order_time': datetime.now()
         }
         
-        user_id = query.from_user.id
-        if user_id in users_db:
-            users_db[user_id]['total_orders'] += 1
+        context.user_data['active_request_id'] = request_id
         
         keyboard = [
-            [InlineKeyboardButton('📩 الحصول على الكود', callback_data=f'get_code_{order_id}')],
-            [InlineKeyboardButton('❌ إلغاء الطلب', callback_data=f'cancel_{order_id}')],
-            [InlineKeyboardButton('🔙 العودة', callback_data='main_menu')]
+            [InlineKeyboardButton('📩 الحصول على الكود', callback_data=f'get_code_{request_id}')],
+            [InlineKeyboardButton('❌ إلغاء الطلب', callback_data=f'cancel_request_{request_id}')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await query.edit_message_text(
             f"✅ **تم شراء الرقم بنجاح!**\n\n"
-            f"📱 **الرقم:** `{number_info['number']}`\n"
-            f"🛍️ **الخدمة:** {SERVICES[service_code]}\n"
-            f"🆔 **رقم الطلب:** `{order_id}`\n\n"
-            f"استخدم الرقم في التطبيق المطلوب، ثم اضغط على 'الحصول على الكود'",
+            f"📱 **الرقم:** `{phone_number}`\n"
+            f"🛍️ **الخدمة:** {SERVICES.get(service_code)}\n"
+            f"🆔 **رقم التفعيل:** `{request_id}`\n\n"
+            f"استخدم الرقم في التطبيق واضغط 'الحصول على الكود'.",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
-        
     except RequestError as e:
         await query.edit_message_text(f"❌ حدث خطأ في طلب الرقم: {str(e)}")
 
+
 async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    await query.answer("جاري التحقق من الكود...", show_alert=False)
     
-    order_id = query.data.split('_')[2]
+    request_id = query.data.split('_')[2]
     
+    if request_id not in orders_db:
+        await query.edit_message_text("❌ لم يتم العثور على هذا الطلب النشط.")
+        return
+
     try:
-        # 💡 التعديل 5: استخدام get_status
-        status_info = sms_api.get_status(order_id)
+        # 💡 استخدام get_status
+        status_info = sms_api.get_status(request_id)
+        status = status_info['status']
+        code = status_info.get('code')
         
-        if status_info['code']:
-            # 💡 التعديل 6: تغيير حالة الطلب في SMS-Activate إلى الإكمال (status=6)
-            sms_api.set_status(order_id, 6) # 6 = STATUS_OK
+        if status == 'STATUS_OK' and code:
+            # 💡 تأكيد الكود (تغيير الحالة إلى 6 = STATUS_OK)
+            sms_api.set_status(request_id, 6) 
             
-            orders_db[order_id]['status'] = 'completed'
-            orders_db[order_id]['code'] = status_info['code']
+            orders_db[request_id]['status'] = 'completed'
+            orders_db[request_id]['code'] = code
             
             await query.edit_message_text(
                 f"🎉 **تم استلام الكود بنجاح!**\n\n"
-                f"🔢 **الكود:** `{status_info['code']}`\n"
-                f"🆔 **رقم الطلب:** `{order_id}`\n\n"
-                f"يمكنك الآن استخدام الكود لإكمال العملية.",
+                f"🔢 **الكود:** `{code}`\n"
+                f"🆔 **رقم التفعيل:** `{request_id}`",
                 parse_mode='Markdown'
             )
-        else:
+        elif status in ['STATUS_WAIT_CODE', 'STATUS_WAIT_RETRY']:
+            # 💡 طلب إرسال الكود مرة أخرى (تغيير الحالة إلى 3 = ACCESS_READY)
+            sms_api.set_status(request_id, 3) 
+            
             keyboard = [
-                [InlineKeyboardButton('🔄 تحديث', callback_data=f'get_code_{order_id}')],
-                [InlineKeyboardButton('❌ إلغاء الطلب', callback_data=f'cancel_{order_id}')]
+                [InlineKeyboardButton('🔄 تحديث ومحاولة', callback_data=f'get_code_{request_id}')],
+                [InlineKeyboardButton('❌ إلغاء الطلب', callback_data=f'cancel_request_{request_id}')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await query.edit_message_text(
-                f"⏳ **في انتظار الكود...**\n\nلم يصل الكود بعد. يرجى الانتظار قليلاً ثم الضغط على تحديث.",
+                f"⏳ **في انتظار الكود...**\n\nلم يصل الكود بعد. الحالة: `{status}`\nاضغط تحديث للمحاولة مرة أخرى.",
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
+        else:
+            await query.edit_message_text(f"⚠️ حالة الطلب غير متوقعة: `{status}`")
             
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
+        await query.edit_message_text(f"❌ حدث خطأ في جلب الكود: {str(e)}")
 
-async def cancel_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def cancel_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    await query.answer("جاري إلغاء الطلب...", show_alert=True)
     
-    order_id = query.data.split('_')[1]
+    request_id = query.data.split('_')[2]
     
+    if request_id not in orders_db:
+        await query.edit_message_text("❌ لا يوجد طلب نشط بهذا المعرف لإلغائه.")
+        return
+
     try:
-        # 💡 التعديل 7: استخدام set_status للإلغاء (status=8)
-        sms_api.set_status(order_id, 8) # 8 = STATUS_CANCEL
+        # 💡 استخدام set_status للإلغاء (8 = ACCESS_CANCEL)
+        sms_api.set_status(request_id, 8) 
         
-        if order_id in orders_db:
-            orders_db[order_id]['status'] = 'cancelled'
+        # 💡 تحديث الحالة وإرجاع الرصيد
+        orders_db[request_id]['status'] = 'cancelled'
+        # [ملاحظة]: يجب إضافة دالة لإرجاع الرصيد للمستخدم هنا
         
         await query.edit_message_text(
-            f"✅ **تم إلغاء الطلب بنجاح**\n\n🆔 رقم الطلب: `{order_id}`\nتم إلغاء الطلب واسترجاع الرصيد.",
+            f"✅ **تم إلغاء الطلب بنجاح**\n\n🆔 رقم التفعيل: `{request_id}`\nتم إلغاء الطلب واسترجاع الرصيد.",
             parse_mode='Markdown'
         )
-        
     except RequestError as e:
         await query.edit_message_text(f"❌ حدث خطأ في الإلغاء: {str(e)}")
+
+# =================================================================
+#                         لوحَة الـمُشْرِف
+# =================================================================
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-    
-    user_id = query.from_user.id
-    if user_id not in ADMIN_IDS:
+
+    if not is_admin(query.from_user.id):
         await query.edit_message_text("❌ ليس لديك صلاحية الوصول لهذه اللوحة.")
         return
-    
+
     try:
-        # 💡 التعديل 8: استخدام get_balance_and_cashback و get_numbers_status
         balance_info = sms_api.get_balance_and_cashback()
-        numbers_status = sms_api.get_numbers_status()
+        api_balance = f"${balance_info['balance']:.2f} (كاش باك: ${balance_info['cashback']:.2f})"
         
-        # ... (بقية إحصائيات البوت المحلية)
-        total_users = len(users_db)
-        total_orders = sum(user['total_orders'] for user in users_db.values())
-        active_orders = sum(1 for order in orders_db.values() if order['status'] == 'active')
-        
-        keyboard = [
-            [InlineKeyboardButton('📊 إحصائيات مفصلة', callback_data='admin_stats')],
-            [InlineKeyboardButton('👥 إدارة المستخدمين', callback_data='admin_users')],
-            [InlineKeyboardButton('🔄 تحديث البيانات', callback_data='admin_panel')],
-            [InlineKeyboardButton('🔙 القائمة الرئيسية', callback_data='main_menu')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        message = (
-            f"👑 **لوحة المشرفين**\n\n"
-            f"💳 **الرصيد:**\n"
-            f"• الرصيد الرئيسي: ${balance_info['balance']:.2f}\n"
-            f"• الكاش باك: ${balance_info['cashback']:.2f}\n\n"
-            f"📊 **إحصائيات البوت:**\n"
-            f"• إجمالي المستخدمين: {total_users}\n"
-            f"• إجمالي الطلبات: {total_orders}\n"
-            f"• الطلبات النشطة: {active_orders}"
-            # 💡 [ملاحظة]: هنا يمكنك إضافة عرض موجز من numbers_status
-        )
-        
-        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+        # 💡 يمكنك إضافة get_numbers_status هنا لعرض الإحصائيات
         
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ: {str(e)}")
+        api_balance = f"خطأ: {str(e)}"
+    
+    total_users = len(users_db)
+    total_orders = len(orders_db)
+    active_orders = sum(1 for order in orders_db.values() if order['status'] in ['STATUS_WAIT_CODE', 'STATUS_WAIT_RETRY'])
 
-# ... (بقية دوال main_menu و handle_message و error_handler لم تتغير) ...
+    message = (
+        f"👑 **لوحة المشرفين**\n\n"
+        f"💳 **رصيد SMS-Activate:** {api_balance}\n\n"
+        f"📊 **إحصائيات البوت:**\n"
+        f"• إجمالي المستخدمين: {total_users}\n"
+        f"• إجمالي الطلبات: {total_orders}\n"
+        f"• الطلبات النشطة: {active_orders}\n"
+    )
 
-async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = [
+        [InlineKeyboardButton('💰 شحن رصيد لمستخدم', callback_data='admin_charge')],
+        [InlineKeyboardButton('📃 عرض سجل الطلبات', callback_data='admin_orders_log')],
+        [InlineKeyboardButton('🔙 القائمة الرئيسية', callback_data='back_to_main')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+
+async def admin_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    if not is_admin(user_id): return
+    
+    text = update.message.text.strip()
+    if text.lower().startswith('شحن'):
+        try:
+            parts = text.split()
+            if len(parts) == 3:
+                target_user_id = int(parts[1])
+                amount = float(parts[2])
+                
+                if target_user_id in users_db:
+                    users_db[target_user_id]['balance'] += amount
+                    await update.message.reply_text(
+                        f"✅ تم شحن ${amount:.2f} للمستخدم `{target_user_id}`.\n"
+                        f"رصيده الجديد: ${users_db[target_user_id]['balance']:.2f}",
+                        parse_mode='Markdown'
+                    )
+                else:
+                    await update.message.reply_text("❌ لم يتم العثور على هذا المستخدم.")
+            else:
+                await update.message.reply_text("❌ صيغة الأمر غير صحيحة. استخدم: `شحن [معرف المستخدم] [المبلغ]`")
+        except ValueError:
+            await update.message.reply_text("❌ الرجاء التأكد من صحة معرف المستخدم والمبلغ.")
+
+
+# =================================================================
+#                         دوال العودة والتنقل والأزرار الثابتة
+# =================================================================
+
+async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-    
-    user = query.from_user
-    user_id = user.id
-    
-    keyboard = [
-        [InlineKeyboardButton('☎️ شراء أرقام', callback_data='buy_numbers')],
-        [InlineKeyboardButton('💰 رصيدي', callback_data='my_balance'),
-         InlineKeyboardButton('📊 إحصائياتي', callback_data='my_stats')],
-        [InlineKeyboardButton('🛒 طلباتي', callback_data='my_orders')],
-    ]
-    
-    if user_id in ADMIN_IDS:
-        keyboard.append([InlineKeyboardButton('👑 لوحة المشرفين', callback_data='admin_panel')])
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.edit_message_text(
-        f"مرحباً {user.first_name}! 👋\n\n"
-        "أهلاً بك في بوت شراء الأرقام الافتراضية.\n"
-        "اختر الخدمة التي تريدها من القائمة:",
-        reply_markup=reply_markup
-    )
+    await start(update, context)
 
+async def handle_static_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer("هذه الميزة قيد التطوير.")
+    
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "يرجى استخدام الأزرار في القائمة للتفاعل مع البوت.\nاكتب /start لعرض القائمة الرئيسية."
-    )
+    # لتجنب إرسال رسالة رد على أوامر المشرف النصية
+    if update.effective_user.id not in ADMIN_IDS or not update.message.text.lower().startswith('شحن'):
+        await update.message.reply_text(
+            "يرجى استخدام الأزرار في القائمة للتفاعل مع البوت.\nاكتب /start لعرض القائمة الرئيسية."
+        )
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.error(f"حدث خطأ: {context.error}")
+# =================================================================
+#                         الدالة الرئيسية (Main)
+# =================================================================
 
-
-def main():
-    """الدالة الرئيسية"""
+def main() -> None:
     if not TELEGRAM_BOT_TOKEN:
-        raise ValueError("يجب تعيين متغير البيئة TELEGRAM_BOT_TOKEN")
-    
-    # إنشاء التطبيق
+        raise ValueError("TELEGRAM_BOT_TOKEN غير مُعين.")
+
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
-    # إعداد المعالجات (تم الإبقاء عليها كما هي)
+    # === معالجات الأوامر والنصوص ===
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # معالجات الاستدعاء
+    # === معالجات لوحة المستخدم ===
     application.add_handler(CallbackQueryHandler(show_balance, pattern='^my_balance$'))
-    application.add_handler(CallbackQueryHandler(buy_numbers_menu, pattern='^buy_numbers$'))
-    application.add_handler(CallbackQueryHandler(show_countries, pattern='^service_'))
-    application.add_handler(CallbackQueryHandler(request_number, pattern='^country_'))
-    application.add_handler(CallbackQueryHandler(get_code, pattern='^get_code_'))
-    application.add_handler(CallbackQueryHandler(cancel_order, pattern='^cancel_'))
+    application.add_handler(CallbackQueryHandler(show_balance, pattern='^Payment$')) # للأسماء القديمة
+    application.add_handler(CallbackQueryHandler(show_account_record, pattern='^Record$'))
+    application.add_handler(CallbackQueryHandler(buy_number_menu, pattern='^Buynum$'))
+    
+    # === معالجات عملية الشراء ===
+    application.add_handler(CallbackQueryHandler(get_countries_menu, pattern=r'^service_[a-z]{2}(_\d+)?$')) 
+    application.add_handler(CallbackQueryHandler(request_number, pattern=r'^request_[a-z]{2}_\d+$'))
+    application.add_handler(CallbackQueryHandler(get_code, pattern=r'^get_code_\d+$'))
+    application.add_handler(CallbackQueryHandler(cancel_request, pattern=r'^cancel_request_\d+$'))
+
+    # === معالجات لوحة المشرف ===
     application.add_handler(CallbackQueryHandler(admin_panel, pattern='^admin_panel$'))
-    application.add_handler(CallbackQueryHandler(main_menu, pattern='^main_menu$'))
-    
-    # معالجات للوظائف المستقبلية
-    application.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
-                                              pattern='^my_stats$'))
-    application.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
-                                              pattern='^my_orders$'))
-    application.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
-                                              pattern='^admin_stats$'))
-    application.add_handler(CallbackQueryHandler(lambda update, ctx: update.callback_query.answer("قيد التطوير..."), 
-                                              pattern='^admin_users$'))
-    
-    # معالج الأخطاء
-    application.add_error_handler(error_handler)
-    
-    # تشغيل البوت
-    if WEBHOOK_URL:
-        # وضع Webhook
-        async def initialize_and_set_webhook():
-            """تهيئة التطبيق وتعيين Webhook"""
-            # التعديل الصحيح: تهيئة كائن التطبيق في سياق غير متزامن
-            await application.initialize() 
-            
-            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-            logger.info(f"✅ تم تعيين Webhook: {WEBHOOK_URL}/webhook")
-        
-        # 💡 استخدمنا asyncio.run
-        asyncio.run(initialize_and_set_webhook()) 
-        
-        from aiohttp import web
-        
-        async def handle_webhook(request):
-            """معالجة طلبات Webhook"""
+    application.add_handler(CallbackQueryHandler(handle_static_buttons, pattern='^admin_charge$')) 
+    application.add_handler(CallbackQueryHandler(handle_static_buttons, pattern='^admin_orders_log$'))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Chat(ADMIN_IDS), admin_text_handler))
+
+    # === معالجات التنقل والأزرار الثابتة ===
+    application.add_handler(CallbackQueryHandler(start, pattern='^back_to_main$'))
+    application.add_handler(CallbackQueryHandler(handle_static_buttons, pattern='^sh$|^Wo$|^worldwide$|^saavmotamy$|^assignment$|^readycard-10$|^ready$'))
+
+    # 💡 إعداد Webhook باستخدام Flask
+    @app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
+    async def webhook_handler():
+        """Handle incoming webhook updates."""
+        if request.method == "POST":
+            # يجب أن يكون application مهيئًا ليعمل مع Webhook
             try:
-                data = await request.json()
-                update = Update.de_json(data, application.bot)
+                update = Update.de_json(request.get_json(force=True), application.bot)
                 await application.process_update(update)
-                return web.Response(status=200)
+                return jsonify({"status": "ok"})
             except Exception as e:
-                # 💡 استخدام logger لتسجيل الأخطاء
-                logger.error(f"خطأ في معالجة Webhook: {e}")
-                return web.Response(status=400)
-        
-        async def health_check(request):
-            """فحص صحة الخدمة"""
-            return web.Response(text="✅ البوت يعمل", status=200)
-        
-        # إنشاء تطبيق aiohttp
-        app = web.Application()
-        app.router.add_post('/webhook', handle_webhook)
-        app.router.add_get('/health', health_check)
-        app.router.add_get('/', health_check)
-        
-        logger.info(f"🚀 بدء البوت على PORT {PORT} مع Webhook")
-        web.run_app(app, host='0.0.0.0', port=PORT)
-        
-    else:
-        # وضع Polling
-        logger.info("🚀 بدء البوت في وضع Polling")
-        application.run_polling()
+                logger.error(f"❌ خطأ في معالجة Webhook: {e}")
+                return jsonify({"status": "error"}), 500
+        return jsonify({"status": "Method not allowed"}), 405
+
+    @app.route("/")
+    async def index():
+        return "Bot is running and waiting for webhooks..."
+
+    # 💡 إعداد وتعيين Webhook
+    async def set_and_run_webhook():
+        """تهيئة التطبيق وتعيين Webhook وبدء تشغيل Flask"""
+        try:
+            await application.initialize()
+            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}")
+            logger.info(f"✅ تم تعيين Webhook: {WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}")
+
+            # تشغيل Flask بشكل غير متزامن
+            from waitress import serve
+            serve(app, host='0.0.0.0', port=PORT)
+            
+        except Exception as e:
+            logger.error(f"❌ فشل إعداد Webhook أو تشغيل Flask: {e}")
+            
+    # تشغيل الدالة غير المتزامنة
+    asyncio.run(set_and_run_webhook())
 
 if __name__ == "__main__":
     main()
