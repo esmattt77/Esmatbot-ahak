@@ -10,6 +10,7 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
+# تأكد من أن ملف sms_activate_api.py موجود
 from sms_activate_api import sms_api, RequestError
 
 # -----------------
@@ -38,211 +39,111 @@ if SMS_ACTIVATE_API_KEY:
 
 # قاموس الخدمات
 SERVICES = {
-    'tg': 'تيليجرام 🔵',
-    'wa': 'واتساب 🟢', 
-    'fb': 'فيسبوك 🟦',
-    'ig': 'انستجرام',
-    'tw': 'تويتر',
+    'tg': 'تيليجرام 🔵', 'wa': 'واتساب 🟢', 'fb': 'فيسبوك 🟦',
+    'ig': 'انستجرام', 'tw': 'تويتر',
 }
 
 # 💡 قاموس ترجمة إنجليزي-عربي شامل مع الأعلام
-# (يعتمد على الأسماء الإنجليزية الرسمية في القائمة التي قدمتها)
 COUNTRY_TRANSLATIONS = {
-    "Ukraine": ('🇺🇦', 'أوكرانيا'),
-    "Kazakhstan": ('🇰🇿', 'كازاخستان'),
-    "China": ('🇨🇳', 'الصين'),
-    "Philippines": ('🇵🇭', 'الفلبين'),
-    "Myanmar": ('🇲🇲', 'ميانمار'),
-    "Indonesia": ('🇮🇩', 'إندونيسيا'),
-    "Malaysia": ('🇲🇾', 'ماليزيا'),
-    "Kenya": ('🇰🇪', 'كينيا'),
-    "Tanzania": ('🇹🇿', 'تنزانيا'),
-    "Vietnam": ('🇻🇳', 'فيتنام'),
-    "Kyrgyzstan": ('🇰🇬', 'قيرغيزستان'),
-    "Israel": ('🇮🇱', 'إسرائيل'),
-    "Hong Kong": ('🇭🇰', 'هونج كونج'),
-    "Poland": ('🇵🇱', 'بولندا'),
-    "United Kingdom": ('🇬🇧', 'المملكة المتحدة'),
-    "Madagascar": ('🇲🇬', 'مدغشقر'),
-    "DR Congo": ('🇨🇩', 'الكونغو الديمقراطية'),
-    "Nigeria": ('🇳🇬', 'نيجيريا'),
-    "Macao": ('🇲🇴', 'ماكاو'),
-    "Egypt": ('🇪🇬', 'مصر'),
-    "India": ('🇮🇳', 'الهند'),
-    "Ireland": ('🇮🇪', 'أيرلندا'),
-    "Cambodia": ('🇰🇭', 'كمبوديا'),
-    "Laos": ('🇱🇦', 'لاوس'),
-    "Haiti": ('🇭🇹', 'هايتي'),
-    "Ivory Coast": ('🇨🇮', 'ساحل العاج'),
-    "Gambia": ('🇬🇲', 'غامبيا'),
-    "Serbia": ('🇷🇸', 'صربيا'),
-    "Yemen": ('🇾🇪', 'اليمن'),
-    "South Africa": ('🇿🇦', 'جنوب أفريقيا'),
-    "Romania": ('🇷🇴', 'رومانيا'),
-    "Colombia": ('🇨🇴', 'كولومبيا'),
-    "Estonia": ('🇪🇪', 'إستونيا'),
-    "Azerbaijan": ('🇦🇿', 'أذربيجان'),
-    "Canada": ('🇨🇦', 'كندا'),
-    "Morocco": ('🇲🇦', 'المغرب'),
-    "Ghana": ('🇬🇭', 'غانا'),
-    "Argentina": ('🇦🇷', 'الأرجنتين'),
-    "Uzbekistan": ('🇺🇿', 'أوزبكستان'),
-    "Cameroon": ('🇨🇲', 'الكاميرون'),
-    "Chad": ('🇹🇩', 'تشاد'),
-    "Germany": ('🇩🇪', 'ألمانيا'),
-    "Lithuania": ('🇱🇹', 'ليتوانيا'),
-    "Croatia": ('🇭🇷', 'كرواتيا'),
-    "Sweden": ('🇸🇪', 'السويد'),
-    "Iraq": ('🇮🇶', 'العراق'),
-    "Netherlands": ('🇳🇱', 'هولندا'),
-    "Latvia": ('🇱🇻', 'لاتفيا'),
-    "Austria": ('🇦🇹', 'النمسا'),
-    "Belarus": ('🇧🇾', 'بيلاروسيا'),
-    "Thailand": ('🇹🇭', 'تايلاند'),
-    "Saudi Arabia": ('🇸🇦', 'السعودية'),
-    "Mexico": ('🇲🇽', 'المكسيك'),
-    "Taiwan": ('🇹🇼', 'تايوان'),
-    "Spain": ('🇪🇸', 'إسبانيا'),
-    "Iran": ('🇮🇷', 'إيران'),
-    "Algeria": ('🇩🇿', 'الجزائر'),
-    "Slovenia": ('🇸🇮', 'سلوفينيا'),
-    "Bangladesh": ('🇧🇩', 'بنجلاديش'),
-    "Senegal": ('🇸🇳', 'السنغال'),
-    "Turkey": ('🇹🇷', 'تركيا'),
-    "Czech": ('🇨🇿', 'التشيك'),
-    "Sri Lanka": ('🇱🇰', 'سريلانكا'),
-    "Peru": ('🇵🇪', 'بيرو'),
-    "Pakistan": ('🇵🇰', 'باكستان'),
-    "New Zealand": ('🇳🇿', 'نيوزيلندا'),
-    "Guinea": ('🇬🇳', 'غينيا'),
-    "Mali": ('🇲🇱', 'مالي'),
-    "Venezuela": ('🇻🇪', 'فنزويلا'),
-    "Ethiopia": ('🇪🇹', 'إثيوبيا'),
-    "Mongolia": ('🇲🇳', 'منغوليا'),
-    "Brazil": ('🇧🇷', 'البرازيل'),
-    "Afghanistan": ('🇦🇫', 'أفغانستان'),
-    "Uganda": ('🇺🇬', 'أوغندا'),
-    "Angola": ('🇦🇴', 'أنجولا'),
-    "Cyprus": ('🇨🇾', 'قبرص'),
-    "France": ('🇫🇷', 'فرنسا'),
-    "Papua": ('🇵🇬', 'بابوا غينيا الجديدة'),
-    "Mozambique": ('🇲🇿', 'موزمبيق'),
-    "Nepal": ('🇳🇵', 'نيبال'),
-    "Belgium": ('🇧🇪', 'بلجيكا'),
-    "Bulgaria": ('🇧🇬', 'بلغاريا'),
-    "Hungary": ('🇭🇺', 'المجر'),
-    "Moldova": ('🇲🇩', 'مولدوفا'),
-    "Italy": ('🇮🇹', 'إيطاليا'),
-    "Paraguay": ('🇵🇾', 'باراجواي'),
-    "Honduras": ('🇭🇳', 'هندوراس'),
-    "Tunisia": ('🇹🇳', 'تونس'),
-    "Nicaragua": ('🇳🇮', 'نيكاراغوا'),
-    "Timor-Leste": ('🇹🇱', 'تيمور الشرقية'),
-    "Bolivia": ('🇧🇴', 'بوليفيا'),
-    "Costa Rica": ('🇨🇷', 'كوستاريكا'),
-    "Guatemala": ('🇬🇹', 'غواتيمالا'),
-    "UAE": ('🇦🇪', 'الإمارات العربية المتحدة'),
-    "Zimbabwe": ('🇿🇼', 'زيمبابوي'),
-    "Puerto Rico": ('🇵🇷', 'بورتوريكو'),
-    "Sudan": ('🇸🇩', 'السودان'),
-    "Togo": ('🇹🇬', 'توجو'),
-    "Kuwait": ('🇰🇼', 'الكويت'),
-    "Salvador": ('🇸🇻', 'السلفادور'),
-    "Libya": ('🇱🇾', 'ليبيا'),
-    "Jamaica": ('🇯🇲', 'جامايكا'),
-    "Trinidad and Tobago": ('🇹🇹', 'ترينيداد وتوباغو'),
-    "Ecuador": ('🇪🇨', 'الإكوادور'),
-    "Swaziland": ('🇸🇿', 'إي سواتيني (سوازيلاند)'),
-    "Oman": ('🇴🇲', 'عمان'),
-    "Bosnia": ('🇧🇦', 'البوسنة والهرسك'),
-    "Dominican Republic": ('🇩🇴', 'جمهورية الدومينيكان'),
-    "Syria": ('🇸🇾', 'سوريا'),
-    "Qatar": ('🇶🇦', 'قطر'),
-    "Panama": ('🇵🇦', 'بنما'),
-    "Cuba": ('🇨🇺', 'كوبا'),
-    "Mauritania": ('🇲🇷', 'موريتانيا'),
-    "Sierra Leone": ('🇸🇱', 'سيراليون'),
-    "Jordan": ('🇯🇴', 'الأردن'),
-    "Portugal": ('🇵🇹', 'البرتغال'),
-    "Barbados": ('🇧🇧', 'بربادوس'),
-    "Burundi": ('🇧🇮', 'بوروندي'),
-    "Benin": ('🇧🇯', 'بنين'),
-    "Brunei": ('🇧🇳', 'بروناي'),
-    "Bahamas": ('🇧🇸', 'جزر البهاما'),
-    "Botswana": ('🇧🇼', 'بوتسوانا'),
-    "Belize": ('🇧🇿', 'بليز'),
-    "Central African Republic": ('🇨🇫', 'جمهورية أفريقيا الوسطى'),
-    "Dominica": ('🇩🇲', 'دومينيكا'),
-    "Grenada": ('🇬🇩', 'غرينادا'),
-    "Georgia": ('🇬🇪', 'جورجيا'),
-    "Greece": ('🇬🇷', 'اليونان'),
-    "Guinea-Bissau": ('🇬🇼', 'غينيا بيساو'),
-    "Guyana": ('🇬🇾', 'غيانا'),
-    "Iceland": ('🇮🇸', 'آيسلندا'),
-    "Comoros": ('🇰🇲', 'جزر القمر'),
-    "Saint Kitts and Nevis": ('🇰🇳', 'سانت كيتس ونيفيس'),
-    "Liberia": ('🇱🇷', 'ليبيريا'),
-    "Lesotho": ('🇱🇸', 'ليسوتو'),
-    "Malawi": ('🇲🇼', 'مالاوي'),
-    "Namibia": ('🇳🇦', 'ناميبيا'),
-    "Niger": ('🇳🇪', 'النيجر'),
-    "Rwanda": ('🇷🇼', 'رواندا'),
-    "Slovakia": ('🇸🇰', 'سلوفاكيا'),
-    "Suriname": ('🇸🇷', 'سورينام'),
-    "Tajikistan": ('🇹🇯', 'طاجيكستان'),
-    "Monaco": ('🇲🇨', 'موناكو'),
-    "Bahrain": ('🇧🇭', 'البحرين'),
-    "Reunion": ('🇷🇪', 'ريونيون'),
-    "Zambia": ('🇿🇲', 'زامبيا'),
-    "Armenia": ('🇦🇲', 'أرمينيا'),
-    "Somalia": ('🇸🇴', 'الصومال'),
-    "Congo": ('🇨🇬', 'الكونغو (برازافيل)'),
-    "Chile": ('🇨🇱', 'تشيلي'),
-    "Burkina Faso": ('🇧🇫', 'بوركينا فاسو'),
-    "Lebanon": ('🇱🇧', 'لبنان'),
-    "Gabon": ('🇬🇦', 'الجابون'),
-    "Albania": ('🇦🇱', 'ألبانيا'),
-    "Uruguay": ('🇺🇾', 'أوروغواي'),
-    "Mauritius": ('🇲🇺', 'موريشيوس'),
-    "Bhutan": ('🇧🇹', 'بوتان'),
-    "Maldives": ('🇲🇻', 'جزر المالديف'),
-    "Guadeloupe": ('🇬🇵', 'جوادلوب'),
-    "Turkmenistan": ('🇹🇲', 'تركمانستان'),
-    "French Guiana": ('🇬🇫', 'غويانا الفرنسية'),
-    "Finland": ('🇫🇮', 'فنلندا'),
-    "Saint Lucia": ('🇱🇨', 'سانت لوسيا'),
-    "Luxembourg": ('🇱🇺', 'لوكسمبورغ'),
+    "Ukraine": ('🇺🇦', 'أوكرانيا'), "Kazakhstan": ('🇰🇿', 'كازاخستان'),
+    "China": ('🇨🇳', 'الصين'), "Philippines": ('🇵🇭', 'الفلبين'),
+    "Myanmar": ('🇲🇲', 'ميانمار'), "Indonesia": ('🇮🇩', 'إندونيسيا'),
+    "Malaysia": ('🇲🇾', 'ماليزيا'), "Kenya": ('🇰🇪', 'كينيا'),
+    "Tanzania": ('🇹🇿', 'تنزانيا'), "Vietnam": ('🇻🇳', 'فيتنام'),
+    "Kyrgyzstan": ('🇰🇬', 'قيرغيزستان'), "Israel": ('🇮🇱', 'إسرائيل'),
+    "Hong Kong": ('🇭🇰', 'هونج كونج'), "Poland": ('🇵🇱', 'بولندا'),
+    "United Kingdom": ('🇬🇧', 'المملكة المتحدة'), "Madagascar": ('🇲🇬', 'مدغشقر'),
+    "DR Congo": ('🇨🇩', 'الكونغو الديمقراطية'), "Nigeria": ('🇳🇬', 'نيجيريا'),
+    "Macao": ('🇲🇴', 'ماكاو'), "Egypt": ('🇪🇬', 'مصر'),
+    "India": ('🇮🇳', 'الهند'), "Ireland": ('🇮🇪', 'أيرلندا'),
+    "Cambodia": ('🇰🇭', 'كمبوديا'), "Laos": ('🇱🇦', 'لاوس'),
+    "Haiti": ('🇭🇹', 'هايتي'), "Ivory Coast": ('🇨🇮', 'ساحل العاج'),
+    "Gambia": ('🇬🇲', 'غامبيا'), "Serbia": ('🇷🇸', 'صربيا'),
+    "Yemen": ('🇾🇪', 'اليمن'), "South Africa": ('🇿🇦', 'جنوب أفريقيا'),
+    "Romania": ('🇷🇴', 'رومانيا'), "Colombia": ('🇨🇴', 'كولومبيا'),
+    "Estonia": ('🇪🇪', 'إستونيا'), "Azerbaijan": ('🇦🇿', 'أذربيجان'),
+    "Canada": ('🇨🇦', 'كندا'), "Morocco": ('🇲🇦', 'المغرب'),
+    "Ghana": ('🇬🇭', 'غانا'), "Argentina": ('🇦🇷', 'الأرجنتين'),
+    "Uzbekistan": ('🇺🇿', 'أوزبكستان'), "Cameroon": ('🇨🇲', 'الكاميرون'),
+    "Chad": ('🇹🇩', 'تشاد'), "Germany": ('🇩🇪', 'ألمانيا'),
+    "Lithuania": ('🇱🇹', 'ليتوانيا'), "Croatia": ('🇭🇷', 'كرواتيا'),
+    "Sweden": ('🇸🇪', 'السويد'), "Iraq": ('🇮🇶', 'العراق'),
+    "Netherlands": ('🇳🇱', 'هولندا'), "Latvia": ('🇱🇻', 'لاتفيا'),
+    "Austria": ('🇦🇹', 'النمسا'), "Belarus": ('🇧🇾', 'بيلاروسيا'),
+    "Thailand": ('🇹🇭', 'تايلاند'), "Saudi Arabia": ('🇸🇦', 'المملكة العربية السعودية'),
+    "Mexico": ('🇲🇽', 'المكسيك'), "Taiwan": ('🇹🇼', 'تايوان'),
+    "Spain": ('🇪🇸', 'إسبانيا'), "Iran": ('🇮🇷', 'إيران'),
+    "Algeria": ('🇩🇿', 'الجزائر'), "Slovenia": ('🇸🇮', 'سلوفينيا'),
+    "Bangladesh": ('🇧🇩', 'بنجلاديش'), "Senegal": ('🇸🇳', 'السنغال'),
+    "Turkey": ('🇹🇷', 'تركيا'), "Czech": ('🇨🇿', 'التشيك'),
+    "Sri Lanka": ('🇱🇰', 'سريلانكا'), "Peru": ('🇵🇪', 'بيرو'),
+    "Pakistan": ('🇵🇰', 'باكستان'), "New Zealand": ('🇳🇿', 'نيوزيلندا'),
+    "Guinea": ('🇬🇳', 'غينيا'), "Mali": ('🇲🇱', 'مالي'),
+    "Venezuela": ('🇻🇪', 'فنزويلا'), "Ethiopia": ('🇪🇹', 'إثيوبيا'),
+    "Mongolia": ('🇲🇳', 'منغوليا'), "Brazil": ('🇧🇷', 'البرازيل'),
+    "Afghanistan": ('🇦🇫', 'أفغانستان'), "Uganda": ('🇺🇬', 'أوغندا'),
+    "Angola": ('🇦🇴', 'أنجولا'), "Cyprus": ('🇨🇾', 'قبرص'),
+    "France": ('🇫🇷', 'فرنسا'), "Papua": ('🇵🇬', 'بابوا غينيا الجديدة'),
+    "Mozambique": ('🇲🇿', 'موزمبيق'), "Nepal": ('🇳🇵', 'نيبال'),
+    "Belgium": ('🇧🇪', 'بلجيكا'), "Bulgaria": ('🇧🇬', 'بلغاريا'),
+    "Hungary": ('🇭🇺', 'المجر'), "Moldova": ('🇲🇩', 'مولدوفا'),
+    "Italy": ('🇮🇹', 'إيطاليا'), "Paraguay": ('🇵🇾', 'باراجواي'),
+    "Honduras": ('🇭🇳', 'هندوراس'), "Tunisia": ('🇹🇳', 'تونس'),
+    "Nicaragua": ('🇳🇮', 'نيكاراغوا'), "Timor-Leste": ('🇹🇱', 'تيمور الشرقية'),
+    "Bolivia": ('🇧🇴', 'بوليفيا'), "Costa Rica": ('🇨🇷', 'كوستاريكا'),
+    "Guatemala": ('🇬🇹', 'غواتيمالا'), "UAE": ('🇦🇪', 'الإمارات العربية المتحدة'),
+    "Zimbabwe": ('🇿🇼', 'زيمبابوي'), "Puerto Rico": ('🇵🇷', 'بورتوريكو'),
+    "Sudan": ('🇸🇩', 'السودان'), "Togo": ('🇹🇬', 'توجو'),
+    "Kuwait": ('🇰🇼', 'الكويت'), "Salvador": ('🇸🇻', 'السلفادور'),
+    "Libya": ('🇱🇾', 'ليبيا'), "Jamaica": ('🇯🇲', 'جامايكا'),
+    "Trinidad and Tobago": ('🇹🇹', 'ترينيداد وتوباغو'), "Ecuador": ('🇪🇨', 'الإكوادور'),
+    "Swaziland": ('🇸🇿', 'إي سواتيني (سوازيلاند)'), "Oman": ('🇴🇲', 'عمان'),
+    "Bosnia": ('🇧🇦', 'البوسنة والهرسك'), "Dominican Republic": ('🇩🇴', 'جمهورية الدومينيكان'),
+    "Syria": ('🇸🇾', 'سوريا'), "Qatar": ('🇶🇦', 'قطر'),
+    "Panama": ('🇵🇦', 'بنما'), "Cuba": ('🇨🇺', 'كوبا'),
+    "Mauritania": ('🇲🇷', 'موريتانيا'), "Sierra Leone": ('🇸🇱', 'سيراليون'),
+    "Jordan": ('🇯🇴', 'الأردن'), "Portugal": ('🇵🇹', 'البرتغال'),
+    "Barbados": ('🇧🇧', 'بربادوس'), "Burundi": ('🇧🇮', 'بوروندي'),
+    "Benin": ('🇧🇯', 'بنين'), "Brunei": ('🇧🇳', 'بروناي'),
+    "Bahamas": ('🇧🇸', 'جزر البهاما'), "Botswana": ('🇧🇼', 'بوتسوانا'),
+    "Belize": ('🇧🇿', 'بليز'), "Central African Republic": ('🇨🇫', 'جمهورية أفريقيا الوسطى'),
+    "Dominica": ('🇩🇲', 'دومينيكا'), "Grenada": ('🇬🇩', 'غرينادا'),
+    "Georgia": ('🇬🇪', 'جورجيا'), "Greece": ('🇬🇷', 'اليونان'),
+    "Guinea-Bissau": ('🇬🇼', 'غينيا بيساو'), "Guyana": ('🇬🇾', 'غيانا'),
+    "Iceland": ('🇮🇸', 'آيسلندا'), "Comoros": ('🇰🇲', 'جزر القمر'),
+    "Saint Kitts and Nevis": ('🇰🇳', 'سانت كيتس ونيفيس'), "Liberia": ('🇱🇷', 'ليبيريا'),
+    "Lesotho": ('🇱🇸', 'ليسوتو'), "Malawi": ('🇲🇼', 'مالاوي'),
+    "Namibia": ('🇳🇦', 'ناميبيا'), "Niger": ('🇳🇪', 'النيجر'),
+    "Rwanda": ('🇷🇼', 'رواندا'), "Slovakia": ('🇸🇰', 'سلوفاكيا'),
+    "Suriname": ('🇸🇷', 'سورينام'), "Tajikistan": ('🇹🇯', 'طاجيكستان'),
+    "Monaco": ('🇲🇨', 'موناكو'), "Bahrain": ('🇧🇭', 'البحرين'),
+    "Reunion": ('🇷🇪', 'ريونيون'), "Zambia": ('🇿🇲', 'زامبيا'),
+    "Armenia": ('🇦🇲', 'أرمينيا'), "Somalia": ('🇸🇴', 'الصومال'),
+    "Congo": ('🇨🇬', 'الكونغو (برازافيل)'), "Chile": ('🇨🇱', 'تشيلي'),
+    "Burkina Faso": ('🇧🇫', 'بوركينا فاسو'), "Lebanon": ('🇱🇧', 'لبنان'),
+    "Gabon": ('🇬🇦', 'الجابون'), "Albania": ('🇦🇱', 'ألبانيا'),
+    "Uruguay": ('🇺🇾', 'أوروغواي'), "Mauritius": ('🇲🇺', 'موريشيوس'),
+    "Bhutan": ('🇧🇹', 'بوتان'), "Maldives": ('🇲🇻', 'جزر المالديف'),
+    "Guadeloupe": ('🇬🇵', 'جوادلوب'), "Turkmenistan": ('🇹🇲', 'تركمانستان'),
+    "French Guiana": ('🇬🇫', 'غويانا الفرنسية'), "Finland": ('🇫🇮', 'فنلندا'),
+    "Saint Lucia": ('🇱🇨', 'سانت لوسيا'), "Luxembourg": ('🇱🇺', 'لوكسمبورغ'),
     "Saint Vincent and the Grenadines": ('🇻🇨', 'سانت فنسنت والغرينادين'),
-    "Equatorial Guinea": ('🇬🇶', 'غينيا الاستوائية'),
-    "Djibouti": ('🇩🇯', 'جيبوتي'),
-    "Antigua and Barbuda": ('🇦🇬', 'أنتيغوا وباربودا'),
-    "Cayman Islands": ('🇰🇾', 'جزر كايمان'),
-    "Montenegro": ('🇲🇪', 'الجبل الأسود'),
-    "Denmark": ('🇩🇰', 'الدنمارك'),
-    "Switzerland": ('🇨🇭', 'سويسرا'),
-    "Norway": ('🇳🇴', 'النرويج'),
-    "Australia": ('🇦🇺', 'أستراليا'),
-    "Eritrea": ('🇪🇷', 'إريتريا'),
-    "South Sudan": ('🇸🇸', 'جنوب السودان'),
-    "Sao Tome and Principe": ('🇸🇹', 'ساو تومي وبرينسيب'),
-    "Aruba": ('🇦🇼', 'أروبا'),
-    "Montserrat": ('🇲🇸', 'مونتسيرات'),
-    "Anguilla": ('🇦🇮', 'أنغويلا'),
-    "Japan": ('🇯🇵', 'اليابان'),
-    "North Macedonia": ('🇲🇰', 'مقدونيا الشمالية'),
-    "Seychelles": ('🇸🇨', 'سيشل'),
-    "New Caledonia": ('🇳🇨', 'كاليدونيا الجديدة'),
-    "Cape Verde": ('🇨🇻', 'الرأس الأخضر'),
-    "USA": ('🇺🇸', 'الولايات المتحدة الأمريكية'),
-    "Palestine": ('🇵🇸', 'فلسطين'),
-    "Fiji": ('🇫🇯', 'فيجي'),
-    "Singapore": ('🇸🇬', 'سنغافورة'),
-    "Malta": ('🇲🇹', 'مالطا'),
-    "Gibraltar": ('🇬🇮', 'جبل طارق'),
-    "Kosovo": ('🇽🇰', 'كوسوفو'),
-    "Niue": ('🇳🇺', 'نيوي')
+    "Equatorial Guinea": ('🇬🇶', 'غينيا الاستوائية'), "Djibouti": ('🇩🇯', 'جيبوتي'),
+    "Antigua and Barbuda": ('🇦🇬', 'أنتيغوا وباربودا'), "Cayman Islands": ('🇰🇾', 'جزر كايمان'),
+    "Montenegro": ('🇲🇪', 'الجبل الأسود'), "Denmark": ('🇩🇰', 'الدنمارك'),
+    "Switzerland": ('🇨🇭', 'سويسرا'), "Norway": ('🇳🇴', 'النرويج'),
+    "Australia": ('🇦🇺', 'أستراليا'), "Eritrea": ('🇪🇷', 'إريتريا'),
+    "South Sudan": ('🇸🇸', 'جنوب السودان'), "Sao Tome and Principe": ('🇸🇹', 'ساو تومي وبرينسيب'),
+    "Aruba": ('🇦🇼', 'أروبا'), "Montserrat": ('🇲🇸', 'مونتسيرات'),
+    "Anguilla": ('🇦🇮', 'أنغويلا'), "Japan": ('🇯🇵', 'اليابان'),
+    "North Macedonia": ('🇲🇰', 'مقدونيا الشمالية'), "Seychelles": ('🇸🇨', 'سيشل'),
+    "New Caledonia": ('🇳🇨', 'كاليدونيا الجديدة'), "Cape Verde": ('🇨🇻', 'الرأس الأخضر'),
+    "USA": ('🇺🇸', 'الولايات المتحدة الأمريكية'), "Palestine": ('🇵🇸', 'فلسطين'),
+    "Fiji": ('🇫🇯', 'فيجي'), "Singapore": ('🇸🇬', 'سنغافورة'),
+    "Malta": ('🇲🇹', 'مالطا'), "Gibraltar": ('🇬🇮', 'جبل طارق'),
+    "Kosovo": ('🇽🇰', 'كوسوفو'), "Niue": ('🇳🇺', 'نيوي'),
+    "Russia": ('🇷🇺', 'روسيا'), # إضافة روسيا لأنها قد تكون موجودة بالاسم الإنجليزي
 }
-
 
 # قواعد بيانات بسيطة (مؤقتة)
 users_db = {}
@@ -318,6 +219,8 @@ async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
 
+# ... (buy_number_menu - لا تغيير)
+
 async def buy_number_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
@@ -342,6 +245,7 @@ async def buy_number_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
+
 
 async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -373,19 +277,17 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 
                 if count > 0:
                     
-                    country_info = countries_names_data.get(country_id_str, {})
+                    # 💡 تخزين السعر في سياق المستخدم لاستخدامه لاحقاً في دالة request_number
+                    context.user_data[f'price_{service_code}_{country_id_str}'] = cost 
                     
-                    # 💡 المنطق الجديد: الاعتماد على الاسم الإنجليزي (eng) لضمان الترجمة
+                    country_info = countries_names_data.get(country_id_str, {})
                     country_name_eng = country_info.get('eng')
                     
-                    # 1. محاولة الترجمة عبر القاموس الإنجليزي-العربي
                     translation_info = COUNTRY_TRANSLATIONS.get(country_name_eng)
                     
                     if translation_info:
-                        # استخدام الاسم المترجم والعلم من القاموس
                         flag, country_name_display = translation_info
                     else:
-                        # في حالة الفشل، نعود للاسم العربي أو الإنجليزي أو الروسي كبديل
                         country_name_display = country_info.get('arab') or country_name_eng or country_info.get('rus') or f"دولة-{country_id_str}"
                         flag = '❓'
                     
@@ -448,25 +350,47 @@ async def get_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer("جاري طلب رقمك...", show_alert=True)
     
     user_id = query.from_user.id
     data = query.data.split('_')
     service_code = data[1]
-    country_id = int(data[2])
+    country_id_str = data[2]
+    
+    # 1. جلب سعر الرقم الذي تم تخزينه مسبقاً
+    price_key = f'price_{service_code}_{country_id_str}'
+    cost = context.user_data.get(price_key)
+
+    if cost is None:
+        await query.answer("❌ خطأ: لم يتم العثور على سعر الرقم. حاول العودة واختيار الدولة مجدداً.", show_alert=True)
+        return
+        
+    # 2. التحقق من رصيد المستخدم
+    user_balance = users_db.get(user_id, {}).get('balance', 0.0)
+    
+    if user_balance < cost:
+        await query.answer(f"⚠️ رصيدك غير كافٍ! السعر: ${cost:.2f} ورصيدك: ${user_balance:.2f}.", show_alert=True)
+        return
+
+    await query.answer("جاري طلب رقمك والخصم من الرصيد...", show_alert=False)
     
     try:
-        number_info = sms_api.get_number(service_code, country_id)
+        # 3. محاولة شراء الرقم من API
+        number_info = sms_api.get_number(service_code, int(country_id_str))
         
         request_id = number_info['id']
         phone_number = number_info['number']
+        
+        # 4. تنفيذ الخصم من رصيد المستخدم المحلي بعد نجاح الطلب
+        users_db[user_id]['balance'] -= cost
+        users_db[user_id]['balance'] = round(users_db[user_id]['balance'], 2) # لضمان عدم وجود أخطاء في التعويم
         
         orders_db[request_id] = {
             'user_id': user_id,
             'phone_number': phone_number,
             'service_code': service_code,
             'status': 'STATUS_WAIT_CODE', 
-            'order_time': datetime.now()
+            'order_time': datetime.now(),
+            'cost': cost # حفظ التكلفة في سجل الطلب
         }
         
         context.user_data['active_request_id'] = request_id
@@ -478,19 +402,24 @@ async def request_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await query.edit_message_text(
-            f"✅ **تم شراء الرقم بنجاح!**\n\n"
+            f"✅ **تم شراء الرقم بنجاح! وتم خصم ${cost:.2f}**\n\n"
             f"📱 **الرقم:** `{phone_number}`\n"
             f"🛍️ **الخدمة:** {SERVICES.get(service_code)}\n"
             f"🆔 **رقم التفعيل:** `{request_id}`\n\n"
-            f"استخدم الرقم في التطبيق واضغط 'الحصول على الكود'.",
+            f"رصيدك المتبقي: ${users_db[user_id]['balance']:.2f}",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ في طلب الرقم: {e.get_api_error_message()}")
+        # ⚠️ في حالة فشل طلب API، لا يجب خصم الرصيد
+        await query.edit_message_text(f"❌ فشل طلب الرقم من API: {e.get_api_error_message()}")
+    except Exception as e:
+        logger.error(f"Error during request_number: {e}")
+        await query.edit_message_text(f"❌ حدث خطأ غير متوقع أثناء شراء الرقم.")
 
 
 async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # ... (get_code - لا تغيير جوهري)
     query = update.callback_query
     await query.answer("جاري التحقق من الكود...", show_alert=False)
     
@@ -537,10 +466,12 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except RequestError as e:
         await query.edit_message_text(f"❌ حدث خطأ في جلب الكود: {e.get_api_error_message()}")
 
+
 async def cancel_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer("جاري إلغاء الطلب...", show_alert=True)
     
+    user_id = query.from_user.id
     request_id = query.data.split('_')[2]
     
     if request_id not in orders_db:
@@ -550,14 +481,26 @@ async def cancel_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         sms_api.set_status(request_id, 8) 
         
+        # ⚠️ منطق استرجاع الرصيد: يتم فقط إذا لم يكن الطلب قد اكتمل
+        if orders_db[request_id]['status'] not in ['completed', 'cancelled']:
+            refund_amount = orders_db[request_id].get('cost', 0.0)
+            users_db[user_id]['balance'] += refund_amount
+            users_db[user_id]['balance'] = round(users_db[user_id]['balance'], 2)
+            refund_msg = f"✅ وتم إضافة ${refund_amount:.2f} إلى رصيدك."
+        else:
+            refund_msg = "⚠️ لم يتم استرجاع الرصيد لأن حالة الطلب كانت مكتملة أو ملغاة مسبقاً."
+            
         orders_db[request_id]['status'] = 'cancelled'
         
         await query.edit_message_text(
-            f"✅ **تم إلغاء الطلب بنجاح**\n\n🆔 رقم التفعيل: `{request_id}`\nتم إلغاء الطلب واسترجاع الرصيد (افتراضياً).",
+            f"✅ **تم إلغاء الطلب بنجاح**\n\n"
+            f"🆔 رقم التفعيل: `{request_id}`\n"
+            f"{refund_msg}\n"
+            f"رصيدك الحالي: ${users_db[user_id]['balance']:.2f}",
             parse_mode='Markdown'
         )
     except RequestError as e:
-        await query.edit_message_text(f"❌ حدث خطأ في الإلغاء: {e.get_api_error_message()}")
+        await query.edit_message_text(f"❌ حدث خطأ في الإلغاء عبر API: {e.get_api_error_message()}")
 
 
 async def show_account_record(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -568,13 +511,14 @@ async def show_account_record(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_orders = [order for order in orders_db.values() if order['user_id'] == user_id]
     
     if user_orders:
-        message = "**سجل طلباتك الأخيرة:**\n\n"
+        message = "**سجل طلباتك الأخيرة (آخر 5):**\n\n"
         for i, order in enumerate(user_orders[-5:]): 
             message += (
-                f"**{i+1}.** **الرقم:** `{order['phone_number']}`\n"
+                f"**{i+1}.** **الرقم:** `{order.get('phone_number', 'غير متوفر')}`\n"
                 f"   **الخدمة:** {SERVICES.get(order.get('service_code'), 'غير معروف')}\n"
+                f"   **التكلفة:** ${order.get('cost', 0.0):.2f}\n"
                 f"   **الحالة:** {order['status']}\n"
-                f"   **الكود:** {order.get('code', 'لم يصل')}\n\n"
+                f"   **التاريخ:** {order['order_time'].strftime('%Y-%m-%d %H:%M')}\n\n"
             )
         keyboard = [[InlineKeyboardButton('🔙 العودة', callback_data='back_to_main')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -608,34 +552,105 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         api_balance = f"خطأ: {e.get_api_error_message()}"
     
     total_users = len(users_db)
-    total_orders = len(orders_db)
-    active_orders = sum(1 for order in orders_db.values() if order['status'] in ['STATUS_WAIT_CODE', 'STATUS_WAIT_RETRY'])
-
+    
     message = (
         f"👑 **لوحة المشرفين**\n\n"
         f"💳 **رصيد SMS-Activate:** {api_balance}\n\n"
         f"📊 **إحصائيات البوت:**\n"
         f"• إجمالي المستخدمين: {total_users}\n"
-        f"• إجمالي الطلبات: {total_orders}\n"
-        f"• الطلبات النشطة: {active_orders}\n"
     )
 
     keyboard = [
-        [InlineKeyboardButton('💰 شحن رصيد لمستخدم', callback_data='admin_charge')],
-        [InlineKeyboardButton('📃 عرض سجل الطلبات', callback_data='admin_orders_log')],
+        [InlineKeyboardButton('💰 شحن رصيد لمستخدم', callback_data='admin_charge_prompt')],
         [InlineKeyboardButton('🔙 القائمة الرئيسية', callback_data='back_to_main')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
 
+async def admin_charge_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    if not is_admin(query.from_user.id):
+        await query.edit_message_text("❌ ليس لديك صلاحية الوصول لهذه الوظيفة.")
+        return
+
+    message = (
+        "💰 **نظام شحن الرصيد:**\n\n"
+        "يرجى إرسال أمر الشحن بالتنسيق التالي:\n"
+        "`/شحن [معرف المستخدم] [المبلغ بالدولار]`\n\n"
+        "**مثال:** لشحن 5.50$ للمستخدم الذي معرفه 123456789\n"
+        "`/شحن 123456789 5.50`"
+    )
+    keyboard = [[InlineKeyboardButton('🔙 لوحة المشرفين', callback_data='admin_panel')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+
+async def admin_charge_process(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # يتم استدعاء هذه الدالة عبر الأمر النصي /شحن
+    
+    if not is_admin(update.effective_user.id):
+        return
+
+    try:
+        # /شحن 123456789 5.50
+        args = context.args
+        if len(args) != 2:
+            await update.message.reply_text("⚠️ تنسيق الأمر غير صحيح. استخدم: `/شحن [معرف المستخدم] [المبلغ]`", parse_mode='Markdown')
+            return
+
+        target_user_id = int(args[0])
+        amount = float(args[1])
+        
+        if amount <= 0:
+            await update.message.reply_text("⚠️ يجب أن يكون المبلغ أكبر من الصفر.")
+            return
+
+        # إضافة المستخدم إلى قاعدة البيانات إذا لم يكن موجوداً
+        if target_user_id not in users_db:
+            users_db[target_user_id] = {'balance': 0.0, 'orders': []}
+            
+        users_db[target_user_id]['balance'] += amount
+        users_db[target_user_id]['balance'] = round(users_db[target_user_id]['balance'], 2)
+        
+        new_balance = users_db[target_user_id]['balance']
+
+        await update.message.reply_text(
+            f"✅ **تم شحن رصيد بنجاح!**\n"
+            f"👤 **المستخدم:** `{target_user_id}`\n"
+            f"💰 **المبلغ المشحون:** ${amount:.2f}\n"
+            f"💳 **الرصيد الجديد:** ${new_balance:.2f}",
+            parse_mode='Markdown'
+        )
+        
+        # محاولة إرسال إشعار للمستخدم المشحون (اختياري)
+        try:
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=f"🎉 **تم شحن رصيدك!**\n\nتم إضافة ${amount:.2f} إلى حسابك. رصيدك الحالي: ${new_balance:.2f}",
+                parse_mode='Markdown'
+            )
+        except Exception:
+            # قد يفشل إذا كان المستخدم قد حظر البوت
+            pass 
+
+    except ValueError:
+        await update.message.reply_text("⚠️ تأكد من أن المعرف والمبلغ أرقام صحيحة (المبلغ عشري).")
+    except Exception as e:
+        logger.error(f"Error in admin_charge_process: {e}")
+        await update.message.reply_text("❌ حدث خطأ غير متوقع أثناء عملية الشحن.")
+
+
 async def handle_static_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer("هذه الميزة قيد التطوير.")
     
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.effective_user.id in ADMIN_IDS and update.message.text.lower().startswith('شحن'):
-        pass 
+    # لمنع الرد على أوامر المشرف التي تبدأ بـ /شحن
+    if update.effective_user.id in ADMIN_IDS and update.message.text.lower().startswith('/شحن'):
+        return 
     else:
         await update.message.reply_text(
             "يرجى استخدام الأزرار في القائمة للتفاعل مع البوت.\nاكتب /start لعرض القائمة الرئيسية."
@@ -654,6 +669,7 @@ def main() -> None:
     
     # === Handlers ===
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("شحن", admin_charge_process)) # أمر الشحن للمشرفين
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # المستخدم
@@ -668,9 +684,10 @@ def main() -> None:
     # المشرفين والتنقل
     application.add_handler(CallbackQueryHandler(back_to_main, pattern='^back_to_main$'))
     application.add_handler(CallbackQueryHandler(admin_panel, pattern='^admin_panel$'))
-    application.add_handler(CallbackQueryHandler(handle_static_buttons, pattern='^sh$|^Wo$|^worldwide$|^saavmotamy$|^assignment$|^readycard-10$|^ready$|^admin_charge$|^admin_orders_log$'))
+    application.add_handler(CallbackQueryHandler(admin_charge_prompt, pattern='^admin_charge_prompt$')) # توجيه الشحن
+    application.add_handler(CallbackQueryHandler(handle_static_buttons, pattern='^sh$|^Wo$|^worldwide$|^saavmotamy$|^assignment$|^readycard-10$|^ready$'))
     
-    # 💡 تشغيل الـ Webhook
+    # 💡 تشغيل الـ Webhook (تم تصحيح 'url_path')
     webhook_path = f"/{TELEGRAM_BOT_TOKEN}" 
     
     application.run_webhook(
