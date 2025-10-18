@@ -380,12 +380,16 @@ def main():
     # تشغيل البوت
     if WEBHOOK_URL:
         # وضع Webhook
-        async def set_webhook():
+        async def initialize_and_set_webhook():
+            """تهيئة التطبيق وتعيين Webhook"""
+            # التعديل الصحيح: تهيئة كائن التطبيق في سياق غير متزامن
+            await application.initialize() 
+            
             await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
             logger.info(f"✅ تم تعيين Webhook: {WEBHOOK_URL}/webhook")
         
         import asyncio
-        asyncio.run(set_webhook())
+        asyncio.run(initialize_and_set_webhook())
         
         from aiohttp import web
         
