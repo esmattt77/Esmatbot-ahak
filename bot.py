@@ -7,45 +7,51 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sms_activate_api import HeroSMSAPI
 
+# إعداد السجلات
 logging.basicConfig(level=logging.INFO)
 
-# --- الإعدادات ---
+# الإعدادات الأساسية
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_IDS = [int(i) for i in os.getenv("ADMIN_IDS", "").split(",") if i]
 API_KEY = os.getenv("SMS_ACTIVATE_API_KEY")
-RUB_TO_USD = 0.015 
+RUB_TO_USD = 0.015  # سعر التحويل للربح
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 sms = HeroSMSAPI(API_KEY)
 
-# --- قاموس ترجمة الدول (شامل) --- 
+# --- قائمة الدول المرتبة (عربي + عالمي) ---
 COUNTRIES_NAMES = {
-    "0": "روسيا 🇷🇺",
-    "1": "أوكرانيا 🇺🇦",
-    "2": "كازاخستان 🇰🇿",
-    "3": "الصين 🇨🇳",
-    "4": "الفلبين 🇵🇭",
-    "5": "ميانمار 🇲🇲",
-    "6": "إندونيسيا 🇮🇩",
-    "7": "ماليزيا 🇲🇾",
-    "8": "كينيا 🇰🇪",
-    "10": "فيتنام 🇻🇳",
-    "12": "أمريكا 🇺🇸",
-    "15": "بولندا 🇵🇱",
-    "22": "الهند 🇮🇳",
-    "32": "تايلاند 🇹🇭",
-    "48": "العراق 🇮🇶",
+    # دول عربية
     "51": "مصر 🇪🇬",
+    "95": "السعودية 🇸🇦",
+    "48": "العراق 🇮🇶",
     "52": "المغرب 🇲🇦",
-    "95": "السعودية 🇸🇦"
+    "88": "فلسطين 🇵🇸",
+    "21": "الجزائر 🇩🇿",
+    "27": "تونس 🇹🇳",
+    "91": "الأردن 🇯🇴",
+    "107": "الإمارات 🇦🇪",
+    "110": "الكويت 🇰🇼",
+    "153": "عمان 🇴🇲",
+    # دول عالمية مشهورة
+    "0": "روسيا 🇷🇺",
+    "12": "أمريكا 🇺🇸",
+    "1": "أوكرانيا 🇺🇦",
+    "22": "الهند 🇮🇳",
+    "6": "إندونيسيا 🇮🇩",
+    "10": "فيتنام 🇻🇳",
+    "15": "بولندا 🇵🇱",
+    "32": "تايلاند 🇹🇭",
+    "4": "الفلبين 🇵🇭",
+    "187": "جنوب أفريقيا 🇿🇦"
 }
 
-# --- قاعدة البيانات ---
+# --- إدارة قاعدة البيانات ---
 def db_query(query, params=(), fetch=False):
     with sqlite3.connect("users.db") as conn:
         cursor = conn.execute(query, params)
-        if fetch: return cursor.fetchone() زد
+        if fetch: return cursor.fetchone()
         conn.commit()
 
 db_query("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, balance REAL DEFAULT 0.0)")
@@ -61,116 +67,123 @@ def get_bal(uid):
 async def start_handler(message: types.Message):
     bal = get_bal(message.from_user.id)
     kb = InlineKeyboardBuilder()
-    kb.row(types.InlineKeyboardButton(text="🛒 شراء رقم", callback_data="services"))
+    kb.row(types.InlineKeyboardButton(text="🛒 شراء رقم جديد", callback_data="services"))
     kb.row(types.InlineKeyboardButton(text="💰 رصيدي", callback_data="my_balance"))
     if message.from_user.id in ADMIN_IDS:
         kb.row(types.InlineKeyboardButton(text="⚙️ لوحة الإدارة", callback_data="admin_panel"))
-    await message.answer(f"🤖 مرحباً بك في بوت الأرقام.\nرصيدك: **{round(bal, 2)}$**", reply_markup=kb.as_markup(), parse_mode="Markdown")
+    
+    await message.answer(
+        f"👋 أهلاً بك في متجر الأرقام\n\n"
+        f"💰 رصيدك الحالي: **{round(bal, 2)}$**\n\n"
+        "إختر الخدمة التي تريدها من الأسفل:",
+        reply_markup=kb.as_markup(),
+        parse_mode="Markdown"
+    )
 
 @dp.callback_query(F.data == "services")
 async def show_services(call: types.CallbackQuery):
     kb = InlineKeyboardBuilder()
-    services = {"wa": "واتساب ✅", "tg": "تلجرام ✈️", "go": "جوجل 📧", "lf": "تيك توك 📱"}
+    # أكواد الخدمات الأصلية من موقع SMS-Activate
+    services = {
+        "wa": "واتساب ✅",
+        "tg": "تلجرام ✈️",
+        "go": "جوجل/يوتيوب 📧",
+        "lf": "تيك توك 📱",
+        "ig": "إنستقرام 📸",
+        "fb": "فيسبوك 👤"
+    }
     for code, name in services.items():
         kb.add(types.InlineKeyboardButton(text=name, callback_data=f"set_svc_{code}"))
     kb.adjust(2).row(types.InlineKeyboardButton(text="🔙 عودة", callback_data="back_home"))
-    await call.message.edit_text("إختر الخدمة:", reply_markup=kb.as_markup())
+    await call.message.edit_text("اختر الخدمة المطلوبة:", reply_markup=kb.as_markup())
 
-# --- نظام الصفحات (Pagination) ---
+# --- نظام الصفحات والأسعار ---
 @dp.callback_query(F.data.startswith("set_svc_") | F.data.startswith("page_"))
-async def show_countries_paged(call: types.CallbackQuery):
+async def show_paged_countries(call: types.CallbackQuery):
     parts = call.data.split("_")
-    
-    # تحديد الخدمة والصفحة الحالية
-    if parts[0] == "set":
-        service = parts[2]
-        page = 0
-    else:
-        service = parts[1]
-        page = int(parts[2])
+    service = parts[2] if parts[0] == "set" else parts[1]
+    page = 0 if parts[0] == "set" else int(parts[2])
 
-    await call.answer("⏳ جاري التحميل...")
+    await call.answer("⏳ جاري جلب الأرقام...")
     
     try:
         prices_data = sms.get_prices(service)
-        all_available_countries = []
+        available = []
 
         if isinstance(prices_data, dict):
             for c_id, srv_dict in prices_data.items():
                 if service in srv_dict:
-                    srv_info = srv_dict[service]
-                    keys = list(srv_info.keys())
+                    info = srv_dict[service]
+                    keys = list(info.keys())
                     if not keys: continue
                     try:
-                        raw_price = float(keys[0]) if keys[0].replace('.','').isdigit() else float(srv_info.get('cost', 0))
-                        count = list(srv_info.values())[0]
+                        raw_p = float(keys[0]) if keys[0].replace('.','').isdigit() else float(info.get('cost', 0))
+                        count = list(info.values())[0]
                         if count > 0:
-                            price_usd = round(raw_price * RUB_TO_USD, 2)
-                            all_available_countries.append({
+                            price_usd = round(raw_p * RUB_TO_USD, 2)
+                            available.append({
                                 "id": c_id,
-                                "name": COUNTRIES_NAMES.get(str(c_id), f"دولة رقم {c_id} 🚩"),
+                                "name": COUNTRIES_NAMES.get(str(c_id), f"دولة {c_id} 🚩"),
                                 "price": price_usd,
                                 "count": count
                             })
                     except: continue
 
-        if not all_available_countries:
-            return await call.message.edit_text("⚠️ لا تتوفر أرقام حالياً.", 
+        if not available:
+            return await call.message.edit_text("⚠️ لا تتوفر أرقام حالياً لهذه الخدمة.", 
                 reply_markup=InlineKeyboardBuilder().row(types.InlineKeyboardButton(text="🔙 عودة", callback_data="services")).as_markup())
 
-        # تقسيم القائمة إلى صفحات (10 دول لكل صفحة)
-        page_size = 10
-        total_pages = (len(all_available_countries) + page_size - 1) // page_size
-        start_idx = page * page_size
-        end_idx = start_idx + page_size
-        current_page_items = all_available_countries[start_idx:end_idx]
+        # الترتيب: الدول العربية أولاً
+        available.sort(key=lambda x: "🚩" in x['name'])
+
+        # عرض 10 دول في الصفحة
+        per_page = 10
+        total_pages = (len(available) + per_page - 1) // per_page
+        current_items = available[page*per_page : (page+1)*per_page]
 
         kb = InlineKeyboardBuilder()
-        for item in current_page_items:
-            btn_text = f"{item['name']} | {item['price']}$ ({item['count']} ق)"
-            kb.row(types.InlineKeyboardButton(text=btn_text, callback_data=f"order_{service}_{item['id']}_{item['price']}"))
+        for item in current_items:
+            kb.row(types.InlineKeyboardButton(
+                text=f"{item['name']} | {item['price']}$ ({item['count']} ق)", 
+                callback_data=f"order_{service}_{item['id']}_{item['price']}"
+            ))
 
-        # أزرار التنقل
-        nav_btns = []
-        if page > 0:
-            nav_btns.append(types.InlineKeyboardButton(text="⬅️ السابق", callback_data=f"page_{service}_{page-1}"))
-        if page < total_pages - 1:
-            nav_btns.append(types.InlineKeyboardButton(text="التالي ➡️", callback_data=f"page_{service}_{page+1}"))
+        nav = []
+        if page > 0: nav.append(types.InlineKeyboardButton(text="⬅️ السابق", callback_data=f"page_{service}_{page-1}"))
+        if page < total_pages - 1: nav.append(types.InlineKeyboardButton(text="التالي ➡️", callback_data=f"page_{service}_{page+1}"))
         
-        if nav_btns:
-            kb.row(*nav_btns)
-
-        kb.row(types.InlineKeyboardButton(text="🔙 عودة للخدمات", callback_data="services"))
+        if nav: kb.row(*nav)
+        kb.row(types.InlineKeyboardButton(text="🔙 قائمة الخدمات", callback_data="services"))
         
-        await call.message.edit_text(f"🌍 الأرقام المتاحة لـ {service.upper()} (صفحة {page+1}/{total_pages}):", reply_markup=kb.as_markup())
-
+        await call.message.edit_text(f"🌍 أرقام {service.upper()} - صفحة {page+1}/{total_pages}:", reply_markup=kb.as_markup())
     except Exception as e:
-        logging.error(f"Pagination Error: {e}")
-        await call.answer("❌ حدث خطأ أثناء عرض الصفحات.", show_alert=True)
+        logging.error(f"Error: {e}")
+        await call.answer("❌ خطأ في النظام")
 
-# --- استكمال الدوال (شراء، إلغاء، جلب كود) بنفس المنطق السابق ---
 @dp.callback_query(F.data.startswith("order_"))
 async def process_order(call: types.CallbackQuery):
-    _, service, c_id, price = call.data.split("_")
+    _, svc, cid, price = call.data.split("_")
     price = float(price)
-    user_id = call.from_user.id
-    if get_bal(user_id) < price:
+    uid = call.from_user.id
+    if get_bal(uid) < price:
         return await call.answer("❌ رصيدك غير كافٍ!", show_alert=True)
 
-    res = sms.get_number(service, c_id)
+    await call.answer("📡 جاري حجز الرقم...")
+    res = sms.get_number(svc, cid)
     if isinstance(res, dict) and "id" in res:
-        db_query("UPDATE users SET balance = balance - ? WHERE id = ?", (price, user_id))
+        db_query("UPDATE users SET balance = balance - ? WHERE id = ?", (price, uid))
         kb = InlineKeyboardBuilder()
         kb.row(types.InlineKeyboardButton(text="📩 جلب الكود", callback_data=f"get_sms_{res['id']}"))
         kb.row(types.InlineKeyboardButton(text="❌ إلغاء واسترداد", callback_data=f"cancel_{res['id']}_{price}"))
-        await call.message.edit_text(f"✅ تم حجز الرقم!\n📱 الرقم: `{res['number']}`\n💰 السعر: {price}$", 
+        await call.message.edit_text(f"✅ تم الحجز!\n📱 الرقم: `{res['number']}`\n💰 السعر: {price}$", 
                                      reply_markup=kb.as_markup(), parse_mode="Markdown")
+        
         # إلغاء تلقائي بعد 15 دقيقة
         await asyncio.sleep(900)
         status = sms.get_status(res['id'])
         if "STATUS_WAIT" in status:
             sms.set_status(res['id'], 8)
-            db_query("UPDATE users SET balance = balance + ? WHERE id = ?", (price, user_id))
+            db_query("UPDATE users SET balance = balance + ? WHERE id = ?", (price, uid))
     else:
         await call.answer(f"❌ المورد: {res}", show_alert=True)
 
@@ -183,7 +196,7 @@ async def check_sms(call: types.CallbackQuery):
         await call.message.answer(f"✅ كود التفعيل: `{code}`", parse_mode="Markdown")
         sms.set_status(act_id, 6)
     else:
-        await call.answer("⏳ لم يصل الكود بعد..", show_alert=True)
+        await call.answer("⏳ الكود لم يصل بعد..", show_alert=True)
 
 @dp.callback_query(F.data.startswith("cancel_"))
 async def cancel_order(call: types.CallbackQuery):
@@ -195,11 +208,11 @@ async def cancel_order(call: types.CallbackQuery):
 @dp.callback_query(F.data == "my_balance")
 async def show_balance(call: types.CallbackQuery):
     bal = get_bal(call.from_user.id)
-    await call.message.edit_text(f"💰 رصيدك الحالي: **{round(bal, 2)}$**", 
-        reply_markup=InlineKeyboardBuilder().row(types.InlineKeyboardButton(text="🔙 عودة", callback_data="back_home")).as_markup())
+    await call.message.edit_text(f"💰 رصيدك: **{round(bal, 2)}$**\nآيديك: `{call.from_user.id}`", 
+        reply_markup=InlineKeyboardBuilder().row(types.InlineKeyboardButton(text="🔙 عودة", callback_data="back_home")).as_markup(), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "admin_panel")
-async def admin_panel(call: types.CallbackQuery):
+async def admin_p(call: types.CallbackQuery):
     if call.from_user.id not in ADMIN_IDS: return
     kb = InlineKeyboardBuilder().row(types.InlineKeyboardButton(text="💳 رصيد المورد", callback_data="check_api"))
     kb.row(types.InlineKeyboardButton(text="🔙 عودة", callback_data="back_home"))
@@ -207,7 +220,7 @@ async def admin_panel(call: types.CallbackQuery):
 
 @dp.callback_query(F.data == "check_api")
 async def check_api(call: types.CallbackQuery):
-    await call.answer(f"💰 رصيد المورد: {sms.get_balance()} روبل", show_alert=True)
+    await call.answer(f"💰 رصيد المورد: {sms.get_balance()} RUB", show_alert=True)
 
 @dp.callback_query(F.data == "back_home")
 async def go_back(call: types.CallbackQuery):
