@@ -19,8 +19,7 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 sms = HeroSMSAPI(API_KEY)
 
-# --- قاموس ترجمة الدول (شامل) ---
-COUNTRIES_NAMES = {
+# --- قاموس ترجمة الدول (شامل) --- 
 COUNTRIES_NAMES = {
     "0": "روسيا 🇷🇺",
     "1": "أوكرانيا 🇺🇦",
