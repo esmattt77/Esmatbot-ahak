@@ -45,5 +45,8 @@ class HeroSMSAPI:
         return self._get('getStatus', {'id': activation_id})
 
     def set_status(self, activation_id, status):
+        # status 1: تم الإرسال (انتظار الكود)
+        # status 6: تفعيل ناجح (إنهاء)
+        # status 8: إلغاء الطلب
         return self._get('setStatus', {'id': activation_id, 'status': status})
-                                                     
+        
