@@ -1,4 +1,5 @@
 import requests
+import json
 
 class HeroSMSAPI:
     def __init__(self, api_key):
@@ -28,9 +29,19 @@ class HeroSMSAPI:
             return {"id": parts[1], "number": parts[2]}
         return res
 
-    def set_status(self, activation_id, status):
-        # status: 1 (ready), 6 (complete), 8 (cancel)
-        return self._get('setStatus', {'id': activation_id, 'status': status})
+    def get_prices(self, service, country=None):
+        params = {'service': service}
+        if country:
+            params['country'] = country
+        res = self._get('getPrices', params)
+        try:
+            return json.loads(res)
+        except:
+            return {}
 
     def get_status(self, activation_id):
         return self._get('getStatus', {'id': activation_id})
+
+    def set_status(self, activation_id, status):
+        return self._get('setStatus', {'id': activation_id, 'status': status})
+    
