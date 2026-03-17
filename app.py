@@ -1,42 +1,106 @@
+from flask import Flask, request, jsonify
 import os
 import asyncio
-from aiohttp import web
-from aiogram import types
-from bot import bot, dp
+from bot import NumberSellingBot
+import logging
+import threading
 
-# إعدادات Render
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-PORT = int(os.getenv("PORT", 10000))
+# إعداد التسجيل
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-async def handle_webhook(request):
-    """استقبال التحديثات من تلجرام"""
-    if request.method == "GET":
-        return web.Response(text="Bot is running! 🚀")
+# إنشاء تطبيق Flask
+app = Flask(__name__)
 
+# متغيرات البيئة
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+SMS_ACTIVATE_API_KEY = os.environ.get('SMS_ACTIVATE_API_KEY')
+ADMIN_IDS = os.environ.get('ADMIN_IDS', '').split(',')
+WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
+PORT = int(os.environ.get('PORT', 8080))
+
+# تحويل ADMIN_IDS إلى أرقام صحيحة
+admin_ids = []
+for admin_id in ADMIN_IDS:
+    if admin_id.strip().isdigit():
+        admin_ids.append(int(admin_id.strip()))
+
+# إنشاء كائن البوت
+bot = NumberSellingBot(
+    token=TELEGRAM_BOT_TOKEN,
+    api_key=SMS_ACTIVATE_API_KEY,
+    admin_ids=admin_ids
+)
+
+# حلقة الأحداث غير المتزامنة
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """نقطة نهاية Webhook من تلغرام"""
     try:
-        data = await request.json()
-        update = types.Update.model_validate(data, context={"bot": bot})
-        await dp.feed_update(bot, update)
-        return web.Response(text="OK")
+        update_data = request.get_json()
+        if update_data:
+            # معالجة التحديث في حلقة الأحداث
+            asyncio.run_coroutine_threadsafe(
+                bot.application.process_update(update_data),
+                loop
+            )
+            return jsonify({"status": "ok"}), 200
     except Exception as e:
-        print(f"Error: {e}")
-        return web.Response(status=500, text="Internal Error")
-
-async def on_startup(app):
-    """ضبط الويب هوك عند تشغيل السيرفر"""
-    # حذف الويب هوك القديم وضبط الجديد
-    await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(WEBHOOK_URL)
-    print(f"Webhook set to: {WEBHOOK_URL}")
-
-def main():
-    app = web.Application()
-    app.router.add_post("/", handle_webhook)
-    app.router.add_get("/", handle_webhook)
-    app.on_startup.append(on_startup)
+        logger.error(f"خطأ في معالجة webhook: {e}")
+        return jsonify({"status": "error"}), 500
     
-    # تشغيل السيرفر على المنفذ المطلوب من Render
-    web.run_app(app, host="0.0.0.0", port=PORT)
+    return jsonify({"status": "ok"}), 200
 
-if __name__ == "__main__":
-    main()
+@app.route('/sms-webhook', methods=['POST'])
+def sms_webhook():
+    """نقطة نهاية Webhook من HeroSMS لاستقبال الرسائل"""
+    try:
+        data = request.get_json()
+        if data:
+            # معالجة رسالة SMS الواردة
+            asyncio.run_coroutine_threadsafe(
+                bot.webhook_handler(data),
+                loop
+            )
+            return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        logger.error(f"خطأ في معالجة sms webhook: {e}")
+        return jsonify({"status": "error"}), 500
+    
+    return jsonify({"status": "ok"}), 200
+
+@app.route('/health', methods=['GET'])
+def health():
+    """نقطة نهاية فحص الصحة"""
+    return jsonify({"status": "healthy"}), 200
+
+@app.route('/', methods=['GET'])
+def index():
+    """الصفحة الرئيسية"""
+    return """
+    <html>
+        <head><title>Telegram Number Selling Bot</title></head>
+        <body>
+            <h1>بوت بيع الأرقام الافتراضية</h1>
+            <p>البوت يعمل بشكل طبيعي ✓</p>
+        </body>
+    </html>
+    """
+
+def start_bot():
+    """تشغيل البوت في حلقة الأحداث"""
+    loop.run_until_complete(bot.run_webhook(WEBHOOK_URL, PORT))
+
+if __name__ == '__main__':
+    # تشغيل البوت في خيط منفصل
+    bot_thread = threading.Thread(target=start_bot, daemon=True)
+    bot_thread.start()
+    
+    # تشغيل تطبيق Flask
+    app.run(host='0.0.0.0', port=PORT)
