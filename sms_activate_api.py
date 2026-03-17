@@ -13,14 +13,12 @@ class HeroSMSAPI:
         try:
             response = requests.get(self.url, params=query_params, timeout=15)
             return response.text
-        except Exception as e:
-            return f"ERROR:{str(e)}"
+        except:
+            return "ERROR"
 
     def get_balance(self):
         res = self._get('getBalance')
-        if "ACCESS_BALANCE" in res:
-            return res.split(":")[1]
-        return "0"
+        return res.split(":")[1] if "ACCESS_BALANCE" in res else "0"
 
     def get_number(self, service, country=0):
         res = self._get('getNumber', {'service': service, 'country': country})
@@ -31,22 +29,15 @@ class HeroSMSAPI:
 
     def get_prices(self, service, country=None):
         params = {'service': service}
-        if country:
-            params['country'] = country
+        if country: params['country'] = country
         res = self._get('getPrices', params)
         try:
-            if res.startswith('{') or res.startswith('['):
-                return json.loads(res)
-            return {}
-        except:
-            return {}
+            return json.loads(res) if (res.startswith('{') or res.startswith('[')) else {}
+        except: return {}
 
     def get_status(self, activation_id):
         return self._get('getStatus', {'id': activation_id})
 
     def set_status(self, activation_id, status):
-        # status 1: تم الإرسال (انتظار الكود)
-        # status 6: تفعيل ناجح (إنهاء)
-        # status 8: إلغاء الطلب
         return self._get('setStatus', {'id': activation_id, 'status': status})
         
