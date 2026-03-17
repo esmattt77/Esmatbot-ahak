@@ -11,7 +11,6 @@ class HeroSMSAPI:
         if params:
             query_params.update(params)
         try:
-            # إضافة مهلة زمنية للطلب لمنع تعليق البوت
             response = requests.get(self.url, params=query_params, timeout=15)
             return response.text
         except Exception as e:
@@ -36,7 +35,6 @@ class HeroSMSAPI:
             params['country'] = country
         res = self._get('getPrices', params)
         try:
-            # محاولة تنظيف الرد وتحويله لقاموس بايثون
             if res.startswith('{') or res.startswith('['):
                 return json.loads(res)
             return {}
@@ -48,4 +46,4 @@ class HeroSMSAPI:
 
     def set_status(self, activation_id, status):
         return self._get('setStatus', {'id': activation_id, 'status': status})
-            
+                                                     
