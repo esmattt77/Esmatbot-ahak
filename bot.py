@@ -1,171 +1,428 @@
-import os
-import sqlite3
 import logging
-import asyncio
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+    ContextTypes
+)
 from sms_activate_api import HeroSMSAPI
+import os
+from typing import Dict, Any
+import json
 
-# --- جلب البيانات من متغيرات البيئة (Environment Variables) ---
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-API_KEY = os.getenv("SMS_ACTIVATE_API_KEY")
-# تحويل سلسلة الآيديات من البيئة إلى قائمة أرقام
-ADMIN_IDS = [int(i) for i in os.getenv("ADMIN_IDS", "").split(",") if i]
+# إعداد التسجيل
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-# إعدادات العملة والربح
-# 1 روبل ≈ 0.011 دولار. نستخدم 0.015 كمعامل تحويل شامل للربح.
-EXCHANGE_RATE = 0.015 
+# حالات المحادثة
+SERVICE_SELECTION, COUNTRY_SELECTION, CONFIRM_PURCHASE = range(3)
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
-sms = HeroSMSAPI(API_KEY)
-
-# --- قائمة الدول المترجمة ---
-COUNTRIES = {
-    "0": "روسيا 🇷🇺", "1": "أوكرانيا 🇺🇦", "2": "كازاخستان 🇰🇿", "12": "أمريكا 🇺🇸",
-    "51": "مصر 🇪🇬", "95": "السعودية 🇸🇦", "48": "العراق 🇮🇶", "52": "المغرب 🇲🇦",
-    "88": "فلسطين 🇵🇸", "21": "الجزائر 🇩🇿", "27": "تونس 🇹🇳", "91": "الأردن 🇯🇴",
-    "107": "الإمارات 🇦🇪", "110": "الكويت 🇰🇼", "153": "عمان 🇴🇲", "22": "الهند 🇮🇳",
-    "6": "إندونيسيا 🇮🇩", "10": "فيتنام 🇻🇳", "15": "بولندا 🇵🇱", "187": "جنوب أفريقيا 🇿🇦"
+# الخدمات المتاحة (يمكن تحديثها من API)
+AVAILABLE_SERVICES = {
+    'tg': 'تلغرام',
+    'wa': 'واتساب',
+    'vb': 'Viber',
+    'ok': 'Odnoklassniki',
+    'go': 'Gmail',
+    'ub': 'Uber',
+    'av': 'Avito',
 }
 
-# --- إدارة قاعدة البيانات ---
-def db_init():
-    with sqlite3.connect("users.db") as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, balance REAL DEFAULT 0.0)")
-        conn.commit()
-
-def get_bal(uid):
-    with sqlite3.connect("users.db") as conn:
-        res = conn.execute("SELECT balance FROM users WHERE id = ?", (uid,)).fetchone()
-        if res: return res[0]
-        conn.execute("INSERT INTO users (id, balance) VALUES (?, 0.0)", (uid,))
-        conn.commit()
-        return 0.0
-
-def add_bal(uid, amount):
-    with sqlite3.connect("users.db") as conn:
-        conn.execute("UPDATE users SET balance = balance + ? WHERE id = ?", (amount, uid))
-        conn.commit()
-
-# --- الأوامر الرئيسية ---
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    bal = get_bal(message.from_user.id)
-    kb = InlineKeyboardBuilder()
-    kb.row(types.InlineKeyboardButton(text="🛒 شراء رقم جديد", callback_data="all_srv"))
-    kb.row(types.InlineKeyboardButton(text="💰 رصيدي", callback_data="my_acc"))
-    if message.from_user.id in ADMIN_IDS:
-        kb.row(types.InlineKeyboardButton(text="⚙️ لوحة الإدارة", callback_data="admin_panel"))
+class NumberSellingBot:
+    def __init__(self, token: str, api_key: str, admin_ids: list):
+        self.token = token
+        self.api = HeroSMSAPI(api_key)
+        self.admin_ids = admin_ids
+        self.application = Application.builder().token(token).build()
+        self._setup_handlers()
+        
+    def _setup_handlers(self):
+        """إعداد معالجات الأوامر"""
+        
+        # أمر البدء
+        self.application.add_handler(CommandHandler("start", self.start_command))
+        
+        # أمر الرصيد
+        self.application.add_handler(CommandHandler("balance", self.balance_command))
+        
+        # أمر شراء رقم
+        self.application.add_handler(CommandHandler("buy", self.buy_command))
+        
+        # أمر المساعدة
+        self.application.add_handler(CommandHandler("help", self.help_command))
+        
+        # أوامر المشرفين
+        self.application.add_handler(CommandHandler("admin", self.admin_command, filters=filters.User(user_id=self.admin_ids)))
+        
+        # معالج الأزرار
+        self.application.add_handler(CallbackQueryHandler(self.button_handler))
+        
+        # محادثة شراء رقم
+        conv_handler = ConversationHandler(
+            entry_points=[CallbackQueryHandler(self.service_selection, pattern="^buy_number$")],
+            states={
+                SERVICE_SELECTION: [CallbackQueryHandler(self.country_selection, pattern="^service_")],
+                COUNTRY_SELECTION: [CallbackQueryHandler(self.confirm_purchase, pattern="^country_")],
+                CONFIRM_PURCHASE: [CallbackQueryHandler(self.process_purchase, pattern="^(confirm|cancel)_")]
+            },
+            fallbacks=[CommandHandler("cancel", self.cancel)]
+        )
+        self.application.add_handler(conv_handler)
     
-    await message.answer(f"🤖 **مرحباً بك في بوت أرقام الخفاش**\n\n💰 رصيدك الحالي: `${round(bal, 2)}`", 
-                         reply_markup=kb.as_markup(), parse_mode="Markdown")
+    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج أمر /start"""
+        user = update.effective_user
+        welcome_message = f"""
+👋 مرحباً {user.first_name}!
 
-# --- عرض الخدمات المتاحة ---
-@dp.callback_query(F.data == "all_srv")
-async def show_services(call: types.CallbackQuery):
-    kb = InlineKeyboardBuilder()
-    srvs = {"wa": "WhatsApp ✅", "tg": "Telegram ✈️", "go": "Google 📧", "lf": "TikTok 📱", "ig": "Instagram 📸", "fb": "Facebook 👤"}
-    for code, name in srvs.items():
-        kb.add(types.InlineKeyboardButton(text=name, callback_data=f"list_{code}_0"))
-    kb.adjust(2).row(types.InlineKeyboardButton(text="🔙 عودة", callback_data="home"))
-    await call.message.edit_text("إختر الخدمة المطلوبة:", reply_markup=kb.as_markup())
+أهلاً بك في بوت شراء الأرقام الافتراضية.
+يمكنك من خلال هذا البوت شراء أرقام مؤقتة لتفعيل حساباتك على مختلف المنصات.
 
-# --- عرض الدول والأسعار (تم إصلاح ظهور السعر الصفر) ---
-@dp.callback_query(F.data.startswith("list_"))
-async def list_countries(call: types.CallbackQuery):
-    _, svc, page = call.data.split("_")
-    page = int(page)
-    await call.answer("⏳ جاري جلب أفضل الأسعار...")
+🔹 **الخدمات المتاحة**:
+• تلغرام - واتساب - Viber
+• Gmail - Uber - Avito
+• والمزيد...
+
+🔹 **المميزات**:
+• أسعار تنافسية
+• أرقام من عدة دول
+• استلام الرسائل فور وصولها
+
+استخدم الأوامر التالية:
+/buy - لشراء رقم جديد
+/balance - لعرض رصيدك
+/help - للمساعدة
+
+📍 للبدء، اضغط على الزر أدناه:
+        """
+        
+        keyboard = [
+            [InlineKeyboardButton("📱 شراء رقم", callback_data="buy_number")],
+            [InlineKeyboardButton("💰 رصيدي", callback_data="check_balance")],
+            [InlineKeyboardButton("❓ مساعدة", callback_data="show_help")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            welcome_message,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
     
-    raw_data = sms.get_prices(service=svc)
-    available = []
+    async def buy_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج أمر /buy"""
+        # عرض الخدمات المتاحة
+        keyboard = []
+        for service_code, service_name in AVAILABLE_SERVICES.items():
+            keyboard.append([InlineKeyboardButton(
+                f"📱 {service_name}",
+                callback_data=f"service_{service_code}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_to_main")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "📋 اختر الخدمة التي تريد رقمًا لها:",
+            reply_markup=reply_markup
+        )
+        
+        return SERVICE_SELECTION
+    
+    async def balance_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج أمر /balance - عرض الرصيد"""
+        try:
+            balance = await self.api.get_balance()
+            await update.message.reply_text(
+                f"💰 رصيدك الحالي: **{balance}** دولار",
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.error(f"خطأ في جلب الرصيد: {e}")
+            await update.message.reply_text("❌ حدث خطأ في جلب الرصيد. الرجاء المحاولة لاحقاً.")
+    
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج أمر /help"""
+        help_text = """
+❓ **مساعدة البوت**
 
-    # معالجة بيانات الـ API لضمان استخراج السعر الصحيح
-    items = raw_data.items() if isinstance(raw_data, dict) else enumerate(raw_data)
-    for cid, srv_info in items:
-        if svc in srv_info:
-            data = srv_info[svc]
+**الأوامر المتاحة:**
+/start - بدء البوت وعرض القائمة الرئيسية
+/buy - شراء رقم جديد
+/balance - عرض رصيدك
+/help - عرض هذه المساعدة
+
+**كيفية الشراء:**
+1️⃣ اختر الخدمة المطلوبة
+2️⃣ اختر الدولة
+3️⃣ قم بتأكيد عملية الشراء
+4️⃣ استلم الرقم وانتظر وصول الرسالة
+
+**ملاحظات مهمة:**
+• يتم خصم المبلغ من رصيدك عند تأكيد الشراء
+• صلاحية الرقم 20 دقيقة لاستلام الرسالة
+• يمكنك إلغاء العملية في أي وقت
+
+للمساعدة الإضافية، تواصل مع المشرفين.
+        """
+        await update.message.reply_text(help_text, parse_mode='Markdown')
+    
+    async def admin_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج أوامر المشرفين"""
+        if len(context.args) == 0:
+            await update.message.reply_text(
+                "🔧 **أوامر المشرفين**\n\n"
+                "/admin balance - عرض رصيد API\n"
+                "/admin services - تحديث قائمة الخدمات\n"
+                "/admin stats - عرض إحصائيات البوت",
+                parse_mode='Markdown'
+            )
+            return
+        
+        command = context.args[0]
+        
+        if command == "balance":
+            balance = await self.api.get_balance()
+            await update.message.reply_text(f"💰 رصيد API: {balance} دولار")
+        
+        elif command == "services":
+            services = await self.api.get_services()
+            if services:
+                services_text = "📋 **الخدمات المتاحة:**\n\n"
+                for service in services[:20]:  # عرض أول 20 خدمة فقط
+                    services_text += f"• {service.get('name', 'N/A')} (رمز: {service.get('code', 'N/A')})\n"
+                await update.message.reply_text(services_text, parse_mode='Markdown')
+            else:
+                await update.message.reply_text("❌ لا توجد خدمات متاحة")
+    
+    async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج الضغط على الأزرار"""
+        query = update.callback_query
+        await query.answer()
+        
+        if query.data == "check_balance":
             try:
-                # جلب السعر الخام بالروبل
-                rub_price = float(data.get('cost', list(data.keys())[0]))
-                count = data.get('count', list(data.values())[0])
-                if count > 0:
-                    # تحويل للدولار وتنسيقه
-                    usd_price = round(rub_price * EXCHANGE_RATE, 2)
-                    if usd_price < 0.01: usd_price = 0.05 # حماية من السعر الصفر
-                    available.append({"id": str(cid), "name": COUNTRIES.get(str(cid), f"دولة {cid}"), "price": usd_price, "count": count})
-            except: continue
-
-    if not available:
-        return await call.message.edit_text("❌ لا تتوفر أرقام حالياً.", reply_markup=InlineKeyboardBuilder().row(types.InlineKeyboardButton(text="🔙", callback_data="all_srv")).as_markup())
-
-    # عرض 10 دول فقط لكل صفحة
-    start, end = page*10, (page+1)*10
-    kb = InlineKeyboardBuilder()
-    for item in available[start:end]:
-        kb.row(types.InlineKeyboardButton(text=f"{item['name']} | ${item['price']} ({item['count']} ق)", 
-                                          callback_data=f"buy_{svc}_{item['id']}_{item['price']}"))
-    
-    nav = []
-    if page > 0: nav.append(types.InlineKeyboardButton(text="⬅️", callback_data=f"list_{svc}_{page-1}"))
-    if end < len(available): nav.append(types.InlineKeyboardButton(text="➡️", callback_data=f"list_{svc}_{page+1}"))
-    if nav: kb.row(*nav)
-    kb.row(types.InlineKeyboardButton(text="🔙 الخدمات", callback_data="all_srv"))
-    
-    await call.message.edit_text(f"🌍 أرقام {svc.upper()} المتاحة:", reply_markup=kb.as_markup())
-
-# --- تنفيذ عملية الشراء (getNumberV2) ---
-@dp.callback_query(F.data.startswith("buy_"))
-async def buy_process(call: types.CallbackQuery):
-    _, svc, cid, price = call.data.split("_")
-    price = float(price)
-    uid = call.from_user.id
-    
-    if get_bal(uid) < price:
-        return await call.answer("❌ رصيدك غير كافٍ!", show_alert=True)
-
-    res = sms.get_number(svc, cid)
-    if isinstance(res, dict) and ("activationId" in res or "id" in res):
-        aid = res.get("activationId") or res.get("id")
-        num = res.get("phoneNumber") or res.get("number")
-        add_bal(uid, -price) # خصم الرصيد
+                balance = await self.api.get_balance()
+                await query.edit_message_text(
+                    f"💰 رصيدك الحالي: **{balance}** دولار",
+                    parse_mode='Markdown'
+                )
+            except Exception as e:
+                await query.edit_message_text("❌ حدث خطأ في جلب الرصيد")
         
-        kb = InlineKeyboardBuilder()
-        kb.row(types.InlineKeyboardButton(text="📩 جلب الكود", callback_data=f"otp_{aid}"))
-        kb.row(types.InlineKeyboardButton(text="❌ إلغاء واسترداد", callback_data=f"can_{aid}_{price}"))
+        elif query.data == "show_help":
+            await self.help_command(update, context)
         
-        await call.message.edit_text(f"✅ تم شراء الرقم!\n📱 الرقم: `{num}`\n💰 السعر: `${price}`", 
-                                     reply_markup=kb.as_markup(), parse_mode="Markdown")
-    else:
-        await call.answer(f"❌ فشل من الموقع: {res}", show_alert=True)
-
-# --- لوحة التحكم الشاملة للمسؤول ---
-@dp.callback_query(F.data == "admin_panel")
-async def admin_panel(call: types.CallbackQuery):
-    if call.from_user.id not in ADMIN_IDS: return
-    kb = InlineKeyboardBuilder()
-    kb.row(types.InlineKeyboardButton(text="💳 رصيد الموقع", callback_data="adm_bal"),
-           types.InlineKeyboardButton(text="📜 السجل العام", callback_data="adm_hist"))
-    kb.row(types.InlineKeyboardButton(text="🛠 قائمة الخدمات", callback_data="adm_srvs"),
-           types.InlineKeyboardButton(text="🌍 أفضل الدول", callback_data="adm_top"))
-    kb.row(types.InlineKeyboardButton(text="🔙 الرئيسية", callback_data="home"))
-    kb.adjust(2)
-    await call.message.edit_text("⚙️ **لوحة تحكم المسؤول الشاملة**", reply_markup=kb.as_markup(), parse_mode="Markdown")
-
-@dp.callback_query(F.data == "adm_bal")
-async def adm_bal(call: types.CallbackQuery):
-    await call.answer(f"💰 رصيد المورد: {sms.get_balance()} RUB", show_alert=True)
-
-@dp.callback_query(F.data == "home")
-async def go_home(call: types.CallbackQuery):
-    await cmd_start(call.message)
-
-# --- تشغيل ---
-async def main():
-    db_init()
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        elif query.data == "back_to_main":
+            await self.start_command(update, context)
+    
+    async def service_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """اختيار الخدمة"""
+        query = update.callback_query
+        await query.answer()
+        
+        service_code = query.data.replace("service_", "")
+        context.user_data['selected_service'] = service_code
+        context.user_data['service_name'] = AVAILABLE_SERVICES.get(service_code, service_code)
+        
+        # عرض الدول المتاحة (مبسطة)
+        countries = {
+            '6': 'روسيا',
+            '2': 'كازاخستان',
+            '1': 'أوكرانيا',
+            '0': 'جميع الدول'
+        }
+        
+        keyboard = []
+        for country_code, country_name in countries.items():
+            keyboard.append([InlineKeyboardButton(
+                f"🇷🇺 {country_name}" if country_code == '6' else f"🇰🇿 {country_name}" if country_code == '2' else f"🇺🇦 {country_name}" if country_code == '1' else f"🌍 {country_name}",
+                callback_data=f"country_{country_code}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="buy_number")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"📱 الخدمة المختارة: **{context.user_data['service_name']}**\n\n"
+            "🌍 اختر الدولة:",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+        return COUNTRY_SELECTION
+    
+    async def country_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """اختيار الدولة"""
+        query = update.callback_query
+        await query.answer()
+        
+        country_code = query.data.replace("country_", "")
+        context.user_data['selected_country'] = int(country_code)
+        
+        # عرض تأكيد الشراء مع السعر التقريبي
+        service = context.user_data['selected_service']
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ تأكيد الشراء", callback_data="confirm_purchase"),
+                InlineKeyboardButton("❌ إلغاء", callback_data="cancel_purchase")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"📱 **تفاصيل الطلب**\n\n"
+            f"الخدمة: {context.user_data['service_name']}\n"
+            f"الدولة: {'روسيا' if context.user_data['selected_country'] == 6 else 'كازاخستان'}\n"
+            f"السعر التقريبي: 0.5 - 2 دولار\n\n"
+            f"⚠️ هل تريد تأكيد الشراء؟",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+        return CONFIRM_PURCHASE
+    
+    async def confirm_purchase(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """تأكيد الشراء - placeholder"""
+        query = update.callback_query
+        await query.answer()
+        
+        if query.data == "confirm_purchase":
+            # هنا سيتم تنفيذ عملية الشراء الفعلية
+            await query.edit_message_text(
+                "🔄 جاري طلب الرقم...",
+                parse_mode='Markdown'
+            )
+            
+            # محاكاة طلب رقم (سيتم استبداله بالطلب الفعلي)
+            import asyncio
+            await asyncio.sleep(2)
+            
+            await query.edit_message_text(
+                "✅ **تمت العملية بنجاح!**\n\n"
+                "الرقم: +7 (999) 123-45-67\n"
+                "رمز التفعيل: 12345\n\n"
+                "⏱️ الرقم صالح لمدة 20 دقيقة.\n"
+                "سيتم إعلامك عند وصول رسالة جديدة.",
+                parse_mode='Markdown'
+            )
+        
+        elif query.data == "cancel_purchase":
+            await query.edit_message_text(
+                "❌ تم إلغاء عملية الشراء.",
+                parse_mode='Markdown'
+            )
+            return ConversationHandler.END
+        
+        return ConversationHandler.END
+    
+    async def process_purchase(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالجة الشراء الفعلية"""
+        query = update.callback_query
+        await query.answer()
+        
+        if query.data == "confirm_yes":
+            # تنفيذ الشراء الفعلي عبر API
+            service = context.user_data['selected_service']
+            country = context.user_data['selected_country']
+            
+            try:
+                # طلب رقم من API
+                number_data = await self.api.get_number(service, country)
+                
+                if number_data:
+                    activation_id = number_data.get('activationId')
+                    phone_number = number_data.get('phoneNumber')
+                    
+                    # حفظ بيانات التفعيل في context
+                    context.user_data['current_activation'] = {
+                        'id': activation_id,
+                        'phone': phone_number,
+                        'service': service
+                    }
+                    
+                    await query.edit_message_text(
+                        f"✅ **تم شراء الرقم بنجاح!**\n\n"
+                        f"📱 الرقم: `{phone_number}`\n"
+                        f"🆔 معرف التفعيل: {activation_id}\n"
+                        f"⏱️ صالح لمدة: 20 دقيقة\n\n"
+                        f"سيتم إعلامك عند وصول الرسالة.",
+                        parse_mode='Markdown'
+                    )
+                    
+                    # هنا يمكن إضافة مراقبة وصول الرسالة
+                    
+                else:
+                    await query.edit_message_text(
+                        "❌ فشل في الحصول على رقم. الرجاء المحاولة مرة أخرى.",
+                        parse_mode='Markdown'
+                    )
+            
+            except Exception as e:
+                logger.error(f"خطأ في عملية الشراء: {e}")
+                await query.edit_message_text(
+                    "❌ حدث خطأ أثناء الشراء. الرجاء المحاولة لاحقاً.",
+                    parse_mode='Markdown'
+                )
+        
+        elif query.data == "confirm_no":
+            await query.edit_message_text(
+                "❌ تم إلغاء عملية الشراء.",
+                parse_mode='Markdown'
+            )
+        
+        return ConversationHandler.END
+    
+    async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """إلغاء المحادثة"""
+        await update.message.reply_text(
+            "تم إلغاء العملية.",
+            parse_mode='Markdown'
+        )
+        return ConversationHandler.END
+    
+    async def webhook_handler(self, request_data: Dict[str, Any]):
+        """معالج Webhook لاستقبال الرسائل من HeroSMS"""
+        logger.info(f"استقبال Webhook: {request_data}")
+        
+        # معالجة بيانات الرسالة الواردة
+        activation_id = request_data.get('activation_id')
+        sms_code = request_data.get('code')
+        sms_text = request_data.get('text')
+        
+        if activation_id and sms_code:
+            # البحث عن المستخدم صاحب هذا التفعيل وإرسال الرسالة له
+            # هذا يتطلب تخزين بيانات المستخدمين والتفعيلات في قاعدة بيانات
+            
+            logger.info(f"تم استلام كود للتفعيل {activation_id}: {sms_code}")
+            
+            # هنا يمكن إرسال رسالة للمستخدم عبر البوت
+            # سيتم تطبيق هذا الجزء لاحقاً عند إضافة قاعدة بيانات
+        
+        return {"status": "ok"}
+    
+    async def run_webhook(self, webhook_url: str, port: int):
+        """تشغيل البوت باستخدام Webhook"""
+        await self.application.bot.set_webhook(url=f"{webhook_url}/webhook")
+        logger.info(f"Webhook تم تعيينه على: {webhook_url}/webhook")
+        
+        # بدء تشغيل البوت مع webhook
+        await self.application.initialize()
+        await self.application.start()
+        
+        # سيتم تشغيل webhook server في app.py
+        
+    async def run_polling(self):
+        """تشغيل البوت باستخدام Polling (للتطوير المحلي)"""
+        await self.application.initialize()
+        await self.application.start()
+        logger.info("بدء تشغيل البوت باستخدام polling...")
+        await self.application.updater.start_polling()
