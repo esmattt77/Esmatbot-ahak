@@ -35,7 +35,7 @@ COUNTRIES_NAMES = {
 def db_query(query, params=(), fetch=False):
     with sqlite3.connect("users.db") as conn:
         cursor = conn.execute(query, params)
-        if fetch: return cursor.fetchone()
+        if fetch: return cursor.fetchone() زد
         conn.commit()
 
 db_query("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, balance REAL DEFAULT 0.0)")
