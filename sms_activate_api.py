@@ -11,7 +11,7 @@ class HeroSMSAPI:
         if params:
             query_params.update(params)
         try:
-            response = requests.get(self.url, params=query_params)
+            response = requests.get(self.url, params=query_params, timeout=10)
             return response.text
         except Exception as e:
             return f"ERROR:{str(e)}"
@@ -35,7 +35,10 @@ class HeroSMSAPI:
             params['country'] = country
         res = self._get('getPrices', params)
         try:
-            return json.loads(res)
+            # التحقق من أن الرد يبدأ بتنسيق JSON
+            if res.startswith('{') or res.startswith('['):
+                return json.loads(res)
+            return {}
         except:
             return {}
 
@@ -44,4 +47,4 @@ class HeroSMSAPI:
 
     def set_status(self, activation_id, status):
         return self._get('setStatus', {'id': activation_id, 'status': status})
-    
+        
