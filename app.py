@@ -29,7 +29,7 @@ setup_bot(bot)
 # إنشاء تطبيق Flask
 app = Flask(__name__)
 
-# مسار webhook الصحيح - يجب أن يكون /webhook فقط
+# مسار webhook الصحيح
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """معالج Webhook الرئيسي"""
@@ -84,30 +84,43 @@ def health():
 def debug():
     """معلومات التصحيح"""
     return {
-        "bot_token": TELEGRAM_BOT_TOKEN[:10] + "..." if TELEGRAM_BOT_TOKEN else None,
-        "webhook_url": WEBHOOK_URL,
+        "bot_token_configured": bool(TELEGRAM_BOT_TOKEN),
+        "webhook_url_configured": WEBHOOK_URL,
         "webhook_full": f"{WEBHOOK_URL}/webhook",
         "port": PORT
     }
 
-if __name__ == '__main__':
-    logger.info("🚀 جاري تشغيل البوت...")
+@app.route('/set_webhook', methods=['GET'])
+def set_webhook_manually():
+    """نقطة نهاية لتعيين webhook يدوياً"""
+    global bot
     
-    # تعيين Webhook - المسار الصحيح هو /webhook
     webhook_url_full = f"{WEBHOOK_URL}/webhook"
     
     try:
+        # حذف webhook القديم
         bot.delete_webhook()
         logger.info("✅ تم حذف webhook القديم")
+        
+        # تعيين webhook جديد
+        result = bot.set_webhook(url=webhook_url_full)
+        
+        if result:
+            logger.info(f"✅ تم تعيين webhook على: {webhook_url_full}")
+            return {"status": "success", "webhook": webhook_url_full}, 200
+        else:
+            logger.error("❌ فشل تعيين webhook")
+            return {"status": "error", "message": "Failed to set webhook"}, 500
+            
     except Exception as e:
-        logger.warning(f"⚠️ فشل حذف webhook القديم: {e}")
+        logger.error(f"❌ خطأ في تعيين webhook: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+if __name__ == '__main__':
+    logger.info("🚀 جاري تشغيل البوت...")
     
-    # تعيين webhook جديد
-    result = bot.set_webhook(url=webhook_url_full)
-    if result:
-        logger.info(f"✅ تم تعيين webhook على: {webhook_url_full}")
-    else:
-        logger.error("❌ فشل تعيين webhook!")
+    # لا نعين webhook هنا - سنعينه يدوياً بعد تشغيل التطبيق
+    logger.info("✅ البوت جاهز، يرجى زيارة /set_webhook لتعيين webhook")
     
     # تشغيل Flask
     app.run(host='0.0.0.0', port=PORT)
