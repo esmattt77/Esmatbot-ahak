@@ -29,7 +29,8 @@ setup_bot(bot)
 # إنشاء تطبيق Flask
 app = Flask(__name__)
 
-@app.route(f'/{TELEGRAM_BOT_TOKEN}', methods=['POST'])
+# مسار webhook الصحيح - يجب أن يكون /webhook فقط
+@app.route('/webhook', methods=['POST'])
 def webhook():
     """معالج Webhook الرئيسي"""
     if request.headers.get('content-type') == 'application/json':
@@ -60,13 +61,14 @@ def index():
                 h1 {{ color: #fff; font-size: 2.5em; }}
                 .status {{ font-size: 1.2em; margin: 20px 0; }}
                 .info {{ opacity: 0.9; }}
+                code {{ background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 5px; }}
             </style>
         </head>
         <body>
             <div class="container">
                 <h1>🤖 بوت بيع الأرقام الافتراضية</h1>
                 <p class="status">✅ البوت يعمل بنجاح!</p>
-                <p class="info">تم تعيين Webhook على: <code>/{TELEGRAM_BOT_TOKEN}</code></p>
+                <p class="info">تم تعيين Webhook على: <code>/webhook</code></p>
                 <p class="info">أرسل <strong>/start</strong> للبوت في Telegram</p>
             </div>
         </body>
@@ -78,11 +80,21 @@ def health():
     """نقطة نهاية فحص الصحة"""
     return {"status": "healthy", "bot": "running"}, 200
 
+@app.route('/debug', methods=['GET'])
+def debug():
+    """معلومات التصحيح"""
+    return {
+        "bot_token": TELEGRAM_BOT_TOKEN[:10] + "..." if TELEGRAM_BOT_TOKEN else None,
+        "webhook_url": WEBHOOK_URL,
+        "webhook_full": f"{WEBHOOK_URL}/webhook",
+        "port": PORT
+    }
+
 if __name__ == '__main__':
     logger.info("🚀 جاري تشغيل البوت...")
     
-    # تعيين Webhook
-    webhook_url_full = f"{WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}"
+    # تعيين Webhook - المسار الصحيح هو /webhook
+    webhook_url_full = f"{WEBHOOK_URL}/webhook"
     
     try:
         bot.delete_webhook()
@@ -91,8 +103,11 @@ if __name__ == '__main__':
         logger.warning(f"⚠️ فشل حذف webhook القديم: {e}")
     
     # تعيين webhook جديد
-    bot.set_webhook(url=webhook_url_full)
-    logger.info(f"✅ تم تعيين webhook على: {webhook_url_full}")
+    result = bot.set_webhook(url=webhook_url_full)
+    if result:
+        logger.info(f"✅ تم تعيين webhook على: {webhook_url_full}")
+    else:
+        logger.error("❌ فشل تعيين webhook!")
     
     # تشغيل Flask
     app.run(host='0.0.0.0', port=PORT)
