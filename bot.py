@@ -247,170 +247,73 @@ def setup_bot(bot):
                     parse_mode='Markdown'
                 )
                 
-# محاولة جلب الأسعار من API
-prices = {}
-if api_client:
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        prices_data = loop.run_until_complete(api_client.get_prices(service))
-        loop.close()
-        
-        if prices_data and isinstance(prices_data, dict):
-            prices = prices_data
-            logger.info(f"✅ تم جلب الأسعار الحقيقية للخدمة {service}: {len(prices)} دولة")
-            
-            # عرض بعض الأسعار للتحقق
-            for country_code, data in list(prices.items())[:5]:
-                if isinstance(data, dict) and service in data:
-                    price = data[service].get('cost', 'N/A')
-                    logger.info(f"   الدولة {country_code}: ${price}")
-    except Exception as e:
-        logger.error(f"❌ خطأ في جلب الأسعار: {e}")
+                # محاولة جلب الأسعار من API
+                prices = {}
+                if api_client:
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        prices_data = loop.run_until_complete(api_client.get_prices(service))
+                        loop.close()
+                        
+                        if prices_data and isinstance(prices_data, dict):
+                            prices = prices_data
+                            logger.info(f"✅ تم جلب الأسعار الحقيقية للخدمة {service}: {len(prices)} دولة")
+                    except Exception as e:
+                        logger.error(f"❌ خطأ في جلب الأسعار: {e}")
+                        prices = {}
                 
                 # قائمة موسعة من الدول مع رموزها وأسعارها
                 countries = [
-                    {
-                        'code': '6',
-                        'name': 'روسيا',
-                        'flag': '🇷🇺',
-                        'price': prices.get('6', {}).get('cost', 0.50) if prices else 0.50
-                    },
-                    {
-                        'code': '2',
-                        'name': 'كازاخستان',
-                        'flag': '🇰🇿',
-                        'price': prices.get('2', {}).get('cost', 0.80) if prices else 0.80
-                    },
-                    {
-                        'code': '1',
-                        'name': 'أوكرانيا',
-                        'flag': '🇺🇦',
-                        'price': prices.get('1', {}).get('cost', 0.60) if prices else 0.60
-                    },
-                    {
-                        'code': '0',
-                        'name': 'جميع الدول',
-                        'flag': '🌍',
-                        'price': prices.get('0', {}).get('cost', 1.50) if prices else 1.50
-                    },
-                    {
-                        'code': '187',
-                        'name': 'مصر',
-                        'flag': '🇪🇬',
-                        'price': prices.get('187', {}).get('cost', 1.20) if prices else 1.20
-                    },
-                    {
-                        'code': '194',
-                        'name': 'السعودية',
-                        'flag': '🇸🇦',
-                        'price': prices.get('194', {}).get('cost', 1.80) if prices else 1.80
-                    },
-                    {
-                        'code': '195',
-                        'name': 'الإمارات',
-                        'flag': '🇦🇪',
-                        'price': prices.get('195', {}).get('cost', 2.00) if prices else 2.00
-                    },
-                    {
-                        'code': '193',
-                        'name': 'الكويت',
-                        'flag': '🇰🇼',
-                        'price': prices.get('193', {}).get('cost', 2.20) if prices else 2.20
-                    },
-                    {
-                        'code': '196',
-                        'name': 'قطر',
-                        'flag': '🇶🇦',
-                        'price': prices.get('196', {}).get('cost', 2.10) if prices else 2.10
-                    },
-                    {
-                        'code': '197',
-                        'name': 'البحرين',
-                        'flag': '🇧🇭',
-                        'price': prices.get('197', {}).get('cost', 2.00) if prices else 2.00
-                    },
-                    {
-                        'code': '198',
-                        'name': 'عمان',
-                        'flag': '🇴🇲',
-                        'price': prices.get('198', {}).get('cost', 1.90) if prices else 1.90
-                    },
-                    {
-                        'code': '3',
-                        'name': 'إندونيسيا',
-                        'flag': '🇮🇩',
-                        'price': prices.get('3', {}).get('cost', 1.10) if prices else 1.10
-                    },
-                    {
-                        'code': '4',
-                        'name': 'الهند',
-                        'flag': '🇮🇳',
-                        'price': prices.get('4', {}).get('cost', 0.90) if prices else 0.90
-                    },
-                    {
-                        'code': '5',
-                        'name': 'الفلبين',
-                        'flag': '🇵🇭',
-                        'price': prices.get('5', {}).get('cost', 1.30) if prices else 1.30
-                    },
-                    {
-                        'code': '7',
-                        'name': 'فيتنام',
-                        'flag': '🇻🇳',
-                        'price': prices.get('7', {}).get('cost', 1.00) if prices else 1.00
-                    },
-                    {
-                        'code': '8',
-                        'name': 'الصين',
-                        'flag': '🇨🇳',
-                        'price': prices.get('8', {}).get('cost', 1.40) if prices else 1.40
-                    },
-                    {
-                        'code': '9',
-                        'name': 'الولايات المتحدة',
-                        'flag': '🇺🇸',
-                        'price': prices.get('9', {}).get('cost', 2.50) if prices else 2.50
-                    },
-                    {
-                        'code': '10',
-                        'name': 'بريطانيا',
-                        'flag': '🇬🇧',
-                        'price': prices.get('10', {}).get('cost', 2.30) if prices else 2.30
-                    },
-                    {
-                        'code': '11',
-                        'name': 'ألمانيا',
-                        'flag': '🇩🇪',
-                        'price': prices.get('11', {}).get('cost', 2.20) if prices else 2.20
-                    },
-                    {
-                        'code': '12',
-                        'name': 'فرنسا',
-                        'flag': '🇫🇷',
-                        'price': prices.get('12', {}).get('cost', 2.10) if prices else 2.10
-                    },
-                    {
-                        'code': '13',
-                        'name': 'إسبانيا',
-                        'flag': '🇪🇸',
-                        'price': prices.get('13', {}).get('cost', 2.00) if prices else 2.00
-                    },
-                    {
-                        'code': '14',
-                        'name': 'إيطاليا',
-                        'flag': '🇮🇹',
-                        'price': prices.get('14', {}).get('cost', 2.00) if prices else 2.00
-                    },
-                    {
-                        'code': '15',
-                        'name': 'تركيا',
-                        'flag': '🇹🇷',
-                        'price': prices.get('15', {}).get('cost', 1.70) if prices else 1.70
-                    }
+                    {'code': '6', 'name': 'روسيا', 'flag': '🇷🇺', 
+                     'price': prices.get('6', {}).get(service, {}).get('cost', 0.50) if prices and isinstance(prices.get('6'), dict) and service in prices.get('6', {}) else 0.50},
+                    {'code': '2', 'name': 'كازاخستان', 'flag': '🇰🇿', 
+                     'price': prices.get('2', {}).get(service, {}).get('cost', 0.80) if prices and isinstance(prices.get('2'), dict) and service in prices.get('2', {}) else 0.80},
+                    {'code': '1', 'name': 'أوكرانيا', 'flag': '🇺🇦', 
+                     'price': prices.get('1', {}).get(service, {}).get('cost', 0.60) if prices and isinstance(prices.get('1'), dict) and service in prices.get('1', {}) else 0.60},
+                    {'code': '0', 'name': 'جميع الدول', 'flag': '🌍', 
+                     'price': prices.get('0', {}).get(service, {}).get('cost', 1.50) if prices and isinstance(prices.get('0'), dict) and service in prices.get('0', {}) else 1.50},
+                    {'code': '187', 'name': 'مصر', 'flag': '🇪🇬', 
+                     'price': prices.get('187', {}).get(service, {}).get('cost', 1.20) if prices and isinstance(prices.get('187'), dict) and service in prices.get('187', {}) else 1.20},
+                    {'code': '194', 'name': 'السعودية', 'flag': '🇸🇦', 
+                     'price': prices.get('194', {}).get(service, {}).get('cost', 1.80) if prices and isinstance(prices.get('194'), dict) and service in prices.get('194', {}) else 1.80},
+                    {'code': '195', 'name': 'الإمارات', 'flag': '🇦🇪', 
+                     'price': prices.get('195', {}).get(service, {}).get('cost', 2.00) if prices and isinstance(prices.get('195'), dict) and service in prices.get('195', {}) else 2.00},
+                    {'code': '193', 'name': 'الكويت', 'flag': '🇰🇼', 
+                     'price': prices.get('193', {}).get(service, {}).get('cost', 2.20) if prices and isinstance(prices.get('193'), dict) and service in prices.get('193', {}) else 2.20},
+                    {'code': '196', 'name': 'قطر', 'flag': '🇶🇦', 
+                     'price': prices.get('196', {}).get(service, {}).get('cost', 2.10) if prices and isinstance(prices.get('196'), dict) and service in prices.get('196', {}) else 2.10},
+                    {'code': '197', 'name': 'البحرين', 'flag': '🇧🇭', 
+                     'price': prices.get('197', {}).get(service, {}).get('cost', 2.00) if prices and isinstance(prices.get('197'), dict) and service in prices.get('197', {}) else 2.00},
+                    {'code': '198', 'name': 'عمان', 'flag': '🇴🇲', 
+                     'price': prices.get('198', {}).get(service, {}).get('cost', 1.90) if prices and isinstance(prices.get('198'), dict) and service in prices.get('198', {}) else 1.90},
+                    {'code': '3', 'name': 'إندونيسيا', 'flag': '🇮🇩', 
+                     'price': prices.get('3', {}).get(service, {}).get('cost', 1.10) if prices and isinstance(prices.get('3'), dict) and service in prices.get('3', {}) else 1.10},
+                    {'code': '4', 'name': 'الهند', 'flag': '🇮🇳', 
+                     'price': prices.get('4', {}).get(service, {}).get('cost', 0.90) if prices and isinstance(prices.get('4'), dict) and service in prices.get('4', {}) else 0.90},
+                    {'code': '5', 'name': 'الفلبين', 'flag': '🇵🇭', 
+                     'price': prices.get('5', {}).get(service, {}).get('cost', 1.30) if prices and isinstance(prices.get('5'), dict) and service in prices.get('5', {}) else 1.30},
+                    {'code': '7', 'name': 'فيتنام', 'flag': '🇻🇳', 
+                     'price': prices.get('7', {}).get(service, {}).get('cost', 1.00) if prices and isinstance(prices.get('7'), dict) and service in prices.get('7', {}) else 1.00},
+                    {'code': '8', 'name': 'الصين', 'flag': '🇨🇳', 
+                     'price': prices.get('8', {}).get(service, {}).get('cost', 1.40) if prices and isinstance(prices.get('8'), dict) and service in prices.get('8', {}) else 1.40},
+                    {'code': '9', 'name': 'الولايات المتحدة', 'flag': '🇺🇸', 
+                     'price': prices.get('9', {}).get(service, {}).get('cost', 2.50) if prices and isinstance(prices.get('9'), dict) and service in prices.get('9', {}) else 2.50},
+                    {'code': '10', 'name': 'بريطانيا', 'flag': '🇬🇧', 
+                     'price': prices.get('10', {}).get(service, {}).get('cost', 2.30) if prices and isinstance(prices.get('10'), dict) and service in prices.get('10', {}) else 2.30},
+                    {'code': '11', 'name': 'ألمانيا', 'flag': '🇩🇪', 
+                     'price': prices.get('11', {}).get(service, {}).get('cost', 2.20) if prices and isinstance(prices.get('11'), dict) and service in prices.get('11', {}) else 2.20},
+                    {'code': '12', 'name': 'فرنسا', 'flag': '🇫🇷', 
+                     'price': prices.get('12', {}).get(service, {}).get('cost', 2.10) if prices and isinstance(prices.get('12'), dict) and service in prices.get('12', {}) else 2.10},
+                    {'code': '13', 'name': 'إسبانيا', 'flag': '🇪🇸', 
+                     'price': prices.get('13', {}).get(service, {}).get('cost', 2.00) if prices and isinstance(prices.get('13'), dict) and service in prices.get('13', {}) else 2.00},
+                    {'code': '14', 'name': 'إيطاليا', 'flag': '🇮🇹', 
+                     'price': prices.get('14', {}).get(service, {}).get('cost', 2.00) if prices and isinstance(prices.get('14'), dict) and service in prices.get('14', {}) else 2.00},
+                    {'code': '15', 'name': 'تركيا', 'flag': '🇹🇷', 
+                     'price': prices.get('15', {}).get(service, {}).get('cost', 1.70) if prices and isinstance(prices.get('15'), dict) and service in prices.get('15', {}) else 1.70}
                 ]
                 
-                # عرض الدول مع الأسعار (صفين في كل سطر لعرض أكثر)
+                # عرض الدول مع الأسعار
                 keyboard = types.InlineKeyboardMarkup(row_width=2)
                 
                 for country in countries:
@@ -435,86 +338,36 @@ if api_client:
                 country = data.replace("country_", "")
                 
                 # استرجاع بيانات المستخدم
-                service = user_data.get(user_id, {}).get('service', 'tg')
-                service_name = user_data.get(user_id, {}).get('service_name', 'تلغرام')
+                user_info = user_data.get(user_id, {})
+                service = user_info.get('service', 'tg')
+                service_name = user_info.get('service_name', 'تلغرام')
                 
-                # أسعار الدول (موسعة)
+                # أسعار الدول
                 country_prices = {
-                    '6': 0.50,
-                    '2': 0.80,
-                    '1': 0.60,
-                    '0': 1.50,
-                    '187': 1.20,
-                    '194': 1.80,
-                    '195': 2.00,
-                    '193': 2.20,
-                    '196': 2.10,
-                    '197': 2.00,
-                    '198': 1.90,
-                    '3': 1.10,
-                    '4': 0.90,
-                    '5': 1.30,
-                    '7': 1.00,
-                    '8': 1.40,
-                    '9': 2.50,
-                    '10': 2.30,
-                    '11': 2.20,
-                    '12': 2.10,
-                    '13': 2.00,
-                    '14': 2.00,
-                    '15': 1.70
+                    '6': 0.50, '2': 0.80, '1': 0.60, '0': 1.50,
+                    '187': 1.20, '194': 1.80, '195': 2.00, '193': 2.20,
+                    '196': 2.10, '197': 2.00, '198': 1.90, '3': 1.10,
+                    '4': 0.90, '5': 1.30, '7': 1.00, '8': 1.40,
+                    '9': 2.50, '10': 2.30, '11': 2.20, '12': 2.10,
+                    '13': 2.00, '14': 2.00, '15': 1.70
                 }
                 
                 country_names = {
-                    '6': 'روسيا',
-                    '2': 'كازاخستان', 
-                    '1': 'أوكرانيا',
-                    '0': 'جميع الدول',
-                    '187': 'مصر',
-                    '194': 'السعودية',
-                    '195': 'الإمارات',
-                    '193': 'الكويت',
-                    '196': 'قطر',
-                    '197': 'البحرين',
-                    '198': 'عمان',
-                    '3': 'إندونيسيا',
-                    '4': 'الهند',
-                    '5': 'الفلبين',
-                    '7': 'فيتنام',
-                    '8': 'الصين',
-                    '9': 'الولايات المتحدة',
-                    '10': 'بريطانيا',
-                    '11': 'ألمانيا',
-                    '12': 'فرنسا',
-                    '13': 'إسبانيا',
-                    '14': 'إيطاليا',
-                    '15': 'تركيا'
+                    '6': 'روسيا', '2': 'كازاخستان', '1': 'أوكرانيا', '0': 'جميع الدول',
+                    '187': 'مصر', '194': 'السعودية', '195': 'الإمارات', '193': 'الكويت',
+                    '196': 'قطر', '197': 'البحرين', '198': 'عمان', '3': 'إندونيسيا',
+                    '4': 'الهند', '5': 'الفلبين', '7': 'فيتنام', '8': 'الصين',
+                    '9': 'الولايات المتحدة', '10': 'بريطانيا', '11': 'ألمانيا', '12': 'فرنسا',
+                    '13': 'إسبانيا', '14': 'إيطاليا', '15': 'تركيا'
                 }
                 
                 country_flags = {
-                    '6': '🇷🇺',
-                    '2': '🇰🇿',
-                    '1': '🇺🇦',
-                    '0': '🌍',
-                    '187': '🇪🇬',
-                    '194': '🇸🇦',
-                    '195': '🇦🇪',
-                    '193': '🇰🇼',
-                    '196': '🇶🇦',
-                    '197': '🇧🇭',
-                    '198': '🇴🇲',
-                    '3': '🇮🇩',
-                    '4': '🇮🇳',
-                    '5': '🇵🇭',
-                    '7': '🇻🇳',
-                    '8': '🇨🇳',
-                    '9': '🇺🇸',
-                    '10': '🇬🇧',
-                    '11': '🇩🇪',
-                    '12': '🇫🇷',
-                    '13': '🇪🇸',
-                    '14': '🇮🇹',
-                    '15': '🇹🇷'
+                    '6': '🇷🇺', '2': '🇰🇿', '1': '🇺🇦', '0': '🌍',
+                    '187': '🇪🇬', '194': '🇸🇦', '195': '🇦🇪', '193': '🇰🇼',
+                    '196': '🇶🇦', '197': '🇧🇭', '198': '🇴🇲', '3': '🇮🇩',
+                    '4': '🇮🇳', '5': '🇵🇭', '7': '🇻🇳', '8': '🇨🇳',
+                    '9': '🇺🇸', '10': '🇬🇧', '11': '🇩🇪', '12': '🇫🇷',
+                    '13': '🇪🇸', '14': '🇮🇹', '15': '🇹🇷'
                 }
                 
                 country_name = country_names.get(country, 'غير معروفة')
