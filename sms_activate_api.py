@@ -43,7 +43,7 @@ class HeroSMSAPI:
             return f"ERROR:EXCEPTION"
     
     async def get_balance(self) -> float:
-        """الحصول على الرصيد الحالي"""
+        """الحصول على الرصيد الحالي - هذه تعمل بشكل صحيح"""
         result = await self._make_request({'action': 'getBalance'})
         
         if result.startswith('ACCESS_BALANCE:'):
@@ -54,7 +54,7 @@ class HeroSMSAPI:
     async def get_number(self, service: str, country: int = 6) -> Optional[Dict[str, Any]]:
         """
         طلب رقم جديد للخدمة المحددة
-        تعيد dict بالصيغة: {'activationId': '123456', 'phoneNumber': '79584******'}
+        API يعيد نصاً بالصيغة: ACCESS_NUMBER:123456789:79584******
         """
         params = {
             'action': 'getNumber',
@@ -63,33 +63,36 @@ class HeroSMSAPI:
         }
         
         try:
-            session = await self._get_session()
-            params['api_key'] = self.api_key
+            result = await self._make_request(params)
+            logger.info(f"📞 استجابة getNumber: {result}")
             
-            async with session.get(self.BASE_URL, params=params) as response:
-                if response.status == 200:
-                    text = await response.text()
-                    logger.info(f"استجابة getNumber: {text}")
-                    
-                    # تحليل الاستجابة - الصيغة: ACCESS_NUMBER:123456789:79584******
-                    if text.startswith('ACCESS_NUMBER:'):
-                        parts = text.split(':')
-                        if len(parts) >= 3:
-                            activation_id = parts[1]
-                            phone_number = parts[2]
-                            return {
-                                'activationId': activation_id,
-                                'phoneNumber': phone_number
-                            }
-                    else:
-                        logger.error(f"استجابة غير متوقعة: {text}")
-                        return None
-                else:
-                    logger.error(f"خطأ في طلب الرقم: {response.status}")
-                    return None
+            # تحليل الاستجابة
+            if result.startswith('ACCESS_NUMBER:'):
+                parts = result.split(':')
+                if len(parts) >= 3:
+                    activation_id = parts[1]
+                    phone_number = parts[2]
+                    return {
+                        'activationId': activation_id,
+                        'phoneNumber': phone_number,
+                        'success': True
+                    }
+            elif result.startswith('NO_NUMBERS'):
+                logger.error("❌ لا توجد أرقام متاحة لهذه الخدمة")
+                return {'error': 'no_numbers', 'success': False}
+            elif result.startswith('NO_BALANCE'):
+                logger.error("❌ رصيد غير كافٍ")
+                return {'error': 'no_balance', 'success': False}
+            elif result.startswith('BAD_SERVICE'):
+                logger.error("❌ خدمة غير صالحة")
+                return {'error': 'bad_service', 'success': False}
+            else:
+                logger.error(f"❌ استجابة غير متوقعة: {result}")
+                return {'error': 'unknown', 'response': result, 'success': False}
+                
         except Exception as e:
-            logger.error(f"استثناء في طلب الرقم: {e}")
-            return None
+            logger.error(f"❌ استثناء في طلب الرقم: {e}")
+            return {'error': str(e), 'success': False}
     
     async def get_number_v2(self, service: str, country: int = 6) -> Optional[Dict[str, Any]]:
         """نسخة V2 من طلب الرقم (ترجع JSON)"""
