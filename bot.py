@@ -3,6 +3,7 @@ from telebot import types
 import logging
 import os
 import asyncio
+import random
 from sms_activate_api import HeroSMSAPI
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,9 @@ def setup_bot(bot):
     api_key = os.environ.get('SMS_ACTIVATE_API_KEY')
     if api_key:
         api_client = HeroSMSAPI(api_key)
+        logger.info("✅ تم تهيئة API client")
+    else:
+        logger.warning("⚠️ SMS_ACTIVATE_API_KEY غير موجودة - سيتم استخدام وضع التجربة")
     
     # قراءة معرفات المشرفين
     admin_ids_str = os.environ.get('ADMIN_IDS', '')
@@ -75,7 +79,7 @@ def setup_bot(bot):
     def balance_command(message):
         """معالج أمر /balance"""
         if not api_client:
-            bot.reply_to(message, "❌ API غير مهيأ")
+            bot.reply_to(message, "❌ API غير مهيأ - وضع التجربة نشط")
             return
         
         try:
@@ -118,7 +122,7 @@ def setup_bot(bot):
 
 **كيفية الشراء:**
 1️⃣ اختر الخدمة المطلوبة
-2️⃣ اختر الدولة
+2️⃣ اختر الدولة (مع عرض السعر)
 3️⃣ قم بتأكيد الشراء
 4️⃣ استلم الرقم ورمز التفعيل
 
@@ -129,6 +133,33 @@ def setup_bot(bot):
         """
         bot.reply_to(message, help_text, parse_mode='Markdown')
     
+    @bot.message_handler(commands=['admin'])
+    def admin_command(message):
+        """معالج أوامر المشرفين"""
+        user_id = message.from_user.id
+        
+        if user_id not in admin_ids:
+            bot.reply_to(message, "❌ هذا الأمر مخصص للمشرفين فقط")
+            return
+        
+        text = message.text.lower()
+        
+        if text == '/admin balance' and api_client:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                balance = loop.run_until_complete(api_client.get_balance())
+                loop.close()
+                bot.reply_to(message, f"💰 رصيد API: {balance} دولار")
+            except Exception as e:
+                bot.reply_to(message, f"❌ خطأ: {e}")
+        
+        elif text == '/admin stats':
+            bot.reply_to(message, f"📊 إحصائيات:\nالمستخدمين النشطين: {len(user_data)}")
+        
+        else:
+            bot.reply_to(message, "🔧 أوامر المشرفين:\n/admin balance - عرض رصيد API\n/admin stats - عرض إحصائيات")
+    
     @bot.callback_query_handler(func=lambda call: True)
     def callback_handler(call):
         """معالج جميع الأزرار"""
@@ -136,12 +167,12 @@ def setup_bot(bot):
             data = call.data
             user_id = call.from_user.id
             
-            logger.info(f"زر مضغوط: {data} من المستخدم {user_id}")
+            logger.info(f"🔘 زر مضغوط: {data} من المستخدم {user_id}")
             
             if data == "balance":
                 # معالجة زر الرصيد
                 if not api_client:
-                    bot.edit_message_text("❌ API غير مهيأ", call.message.chat.id, call.message.message_id)
+                    bot.edit_message_text("❌ API غير مهيأ - وضع التجربة", call.message.chat.id, call.message.message_id)
                     bot.answer_callback_query(call.id)
                     return
                 
@@ -159,7 +190,7 @@ def setup_bot(bot):
                     )
                 except Exception as e:
                     logger.error(f"خطأ في جلب الرصيد: {e}")
-                    bot.edit_message_text("❌ حدث خطأ", call.message.chat.id, call.message.message_id)
+                    bot.edit_message_text("❌ حدث خطأ في جلب الرصيد", call.message.chat.id, call.message.message_id)
             
             elif data == "help":
                 help_text = "❓ للمساعدة، أرسل الأمر /help"
@@ -208,23 +239,72 @@ def setup_bot(bot):
                 user_data[user_id]['service'] = service
                 user_data[user_id]['service_name'] = service_name
                 
-                # عرض الدول
-                keyboard = types.InlineKeyboardMarkup(row_width=2)
+                # رسالة تحميل
+                bot.edit_message_text(
+                    "🔄 **جاري تحميل الأسعار...**",
+                    call.message.chat.id,
+                    call.message.message_id,
+                    parse_mode='Markdown'
+                )
+                
+                # محاولة جلب الأسعار من API
+                prices = {}
+                if api_client:
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        prices_data = loop.run_until_complete(api_client.get_prices(service))
+                        loop.close()
+                        
+                        if prices_data and isinstance(prices_data, dict):
+                            prices = prices_data
+                            logger.info(f"تم جلب الأسعار للخدمة {service}: {prices}")
+                    except Exception as e:
+                        logger.error(f"خطأ في جلب الأسعار: {e}")
+                
+                # عرض الدول مع الأسعار
+                keyboard = types.InlineKeyboardMarkup(row_width=1)
+                
+                # قائمة الدول مع أسعار (من API أو افتراضية)
                 countries = [
-                    ("🇷🇺 روسيا", "country_6"),
-                    ("🇰🇿 كازاخستان", "country_2"),
-                    ("🇺🇦 أوكرانيا", "country_1"),
-                    ("🌍 جميع الدول", "country_0")
+                    {
+                        'code': '6',
+                        'name': 'روسيا',
+                        'flag': '🇷🇺',
+                        'price': prices.get('6', {}).get('cost', 0.5) if prices else 0.5
+                    },
+                    {
+                        'code': '2',
+                        'name': 'كازاخستان',
+                        'flag': '🇰🇿',
+                        'price': prices.get('2', {}).get('cost', 0.8) if prices else 0.8
+                    },
+                    {
+                        'code': '1',
+                        'name': 'أوكرانيا',
+                        'flag': '🇺🇦',
+                        'price': prices.get('1', {}).get('cost', 0.6) if prices else 0.6
+                    },
+                    {
+                        'code': '0',
+                        'name': 'جميع الدول',
+                        'flag': '🌍',
+                        'price': prices.get('0', {}).get('cost', 1.5) if prices else 1.5
+                    }
                 ]
                 
-                buttons = []
-                for name, code in countries:
-                    buttons.append(types.InlineKeyboardButton(name, callback_data=code))
-                keyboard.add(*buttons)
+                for country in countries:
+                    button_text = f"{country['flag']} {country['name']} - ${country['price']:.2f}"
+                    keyboard.add(types.InlineKeyboardButton(
+                        button_text, 
+                        callback_data=f"country_{country['code']}"
+                    ))
+                
                 keyboard.add(types.InlineKeyboardButton("🔙 رجوع", callback_data="buy"))
                 
                 bot.edit_message_text(
-                    f"📱 **الخدمة:** {service_name}\n\n🌍 **اختر الدولة:**",
+                    f"📱 **الخدمة:** {service_name}\n\n"
+                    f"🌍 **اختر الدولة (مع السعر):**",
                     call.message.chat.id,
                     call.message.message_id,
                     reply_markup=keyboard,
@@ -238,16 +318,41 @@ def setup_bot(bot):
                 service = user_data.get(user_id, {}).get('service', 'tg')
                 service_name = user_data.get(user_id, {}).get('service_name', 'تلغرام')
                 
-                country_names = {'6': 'روسيا', '2': 'كازاخستان', '1': 'أوكرانيا', '0': 'جميع الدول'}
+                # أسعار الدول
+                country_prices = {
+                    '6': 0.50,
+                    '2': 0.80,
+                    '1': 0.60,
+                    '0': 1.50
+                }
+                
+                country_names = {
+                    '6': 'روسيا',
+                    '2': 'كازاخستان', 
+                    '1': 'أوكرانيا',
+                    '0': 'جميع الدول'
+                }
+                
+                country_flags = {
+                    '6': '🇷🇺',
+                    '2': '🇰🇿',
+                    '1': '🇺🇦',
+                    '0': '🌍'
+                }
+                
                 country_name = country_names.get(country, 'غير معروفة')
+                country_flag = country_flags.get(country, '🏳️')
+                price = country_prices.get(country, 1.0)
                 
                 # حفظ الدولة
                 if user_id not in user_data:
                     user_data[user_id] = {}
                 user_data[user_id]['country'] = country
                 user_data[user_id]['country_name'] = country_name
+                user_data[user_id]['country_flag'] = country_flag
+                user_data[user_id]['price'] = price
                 
-                # عرض تأكيد الشراء
+                # عرض تأكيد الشراء مع السعر
                 keyboard = types.InlineKeyboardMarkup(row_width=2)
                 keyboard.add(
                     types.InlineKeyboardButton("✅ تأكيد الشراء", callback_data="confirm"),
@@ -257,8 +362,8 @@ def setup_bot(bot):
                 bot.edit_message_text(
                     f"📱 **تفاصيل الطلب**\n\n"
                     f"الخدمة: {service_name}\n"
-                    f"الدولة: {country_name}\n"
-                    f"السعر التقريبي: 0.5 - 2 دولار\n\n"
+                    f"الدولة: {country_flag} {country_name}\n"
+                    f"السعر: **${price:.2f}**\n\n"
                     f"⚠️ هل تريد تأكيد الشراء؟",
                     call.message.chat.id,
                     call.message.message_id,
@@ -268,9 +373,13 @@ def setup_bot(bot):
             
             elif data == "confirm":
                 # تأكيد الشراء
-                service = user_data.get(user_id, {}).get('service', 'tg')
-                service_name = user_data.get(user_id, {}).get('service_name', 'تلغرام')
-                country = user_data.get(user_id, {}).get('country', '6')
+                user_info = user_data.get(user_id, {})
+                service = user_info.get('service', 'tg')
+                service_name = user_info.get('service_name', 'تلغرام')
+                country = user_info.get('country', '6')
+                country_name = user_info.get('country_name', 'روسيا')
+                country_flag = user_info.get('country_flag', '🇷🇺')
+                price = user_info.get('price', 0.5)
                 
                 bot.edit_message_text(
                     "🔄 **جاري طلب الرقم...**\n\nالرجاء الانتظار",
@@ -279,27 +388,87 @@ def setup_bot(bot):
                     parse_mode='Markdown'
                 )
                 
-                # محاكاة طلب رقم (سيتم استبداله بطلب API حقيقي)
-                import time
-                time.sleep(2)
+                # محاولة طلب رقم حقيقي من API
+                if api_client:
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        # تحويل رمز الدولة إلى رقم صحيح
+                        country_int = int(country) if country.isdigit() else 6
+                        
+                        number_data = loop.run_until_complete(
+                            api_client.get_number(service, country_int)
+                        )
+                        loop.close()
+                        
+                        if number_data and number_data.get('phoneNumber'):
+                            phone = number_data.get('phoneNumber')
+                            activation_id = number_data.get('activationId')
+                            
+                            bot.edit_message_text(
+                                f"✅ **تم شراء الرقم بنجاح!**\n\n"
+                                f"📱 **الرقم:** `{phone}`\n"
+                                f"🆔 **معرف التفعيل:** `{activation_id}`\n"
+                                f"💰 **السعر:** ${price:.2f}\n"
+                                f"🌍 **الدولة:** {country_flag} {country_name}\n"
+                                f"📱 **الخدمة:** {service_name}\n\n"
+                                f"⏱️ الرقم صالح لمدة 20 دقيقة\n"
+                                f"📨 سيتم إعلامك عند وصول رسالة جديدة",
+                                call.message.chat.id,
+                                call.message.message_id,
+                                parse_mode='Markdown'
+                            )
+                        else:
+                            # إذا فشل API، استخدم رقماً وهمياً
+                            phone = f"+7 (9{random.randint(10, 99)}) {random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(10, 99)}"
+                            
+                            bot.edit_message_text(
+                                f"✅ **تمت العملية بنجاح! (تجريبي)**\n\n"
+                                f"📱 **الرقم:** `{phone}`\n"
+                                f"💰 **السعر:** ${price:.2f}\n"
+                                f"🌍 **الدولة:** {country_flag} {country_name}\n"
+                                f"📱 **الخدمة:** {service_name}\n\n"
+                                f"⚠️ هذا رقم تجريبي (فشل الاتصال بـ API)",
+                                call.message.chat.id,
+                                call.message.message_id,
+                                parse_mode='Markdown'
+                            )
+                            
+                    except Exception as e:
+                        logger.error(f"خطأ في طلب الرقم من API: {e}")
+                        
+                        # استخدام رقم وهمي في حالة الخطأ
+                        phone = f"+7 (9{random.randint(10, 99)}) {random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(10, 99)}"
+                        
+                        bot.edit_message_text(
+                            f"✅ **تمت العملية بنجاح! (تجريبي)**\n\n"
+                            f"📱 **الرقم:** `{phone}`\n"
+                            f"💰 **السعر:** ${price:.2f}\n"
+                            f"🌍 **الدولة:** {country_flag} {country_name}\n"
+                            f"📱 **الخدمة:** {service_name}\n\n"
+                            f"⚠️ هذا رقم تجريبي (خطأ: {str(e)[:50]}...)",
+                            call.message.chat.id,
+                            call.message.message_id,
+                            parse_mode='Markdown'
+                        )
+                else:
+                    # API غير مهيأ - استخدام أرقام وهمية
+                    phone = f"+7 (9{random.randint(10, 99)}) {random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(10, 99)}"
+                    
+                    bot.edit_message_text(
+                        f"✅ **تمت العملية بنجاح! (تجريبي)**\n\n"
+                        f"📱 **الرقم:** `{phone}`\n"
+                        f"💰 **السعر:** ${price:.2f}\n"
+                        f"🌍 **الدولة:** {country_flag} {country_name}\n"
+                        f"📱 **الخدمة:** {service_name}\n\n"
+                        f"⚠️ هذا رقم تجريبي (API غير مهيأ)",
+                        call.message.chat.id,
+                        call.message.message_id,
+                        parse_mode='Markdown'
+                    )
                 
-                # إنشاء رقم وهمي
-                import random
-                phone = f"+7 (9{random.randint(10, 99)}) {random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(10, 99)}"
-                code = random.randint(10000, 99999)
-                
-                bot.edit_message_text(
-                    f"✅ **تمت العملية بنجاح!**\n\n"
-                    f"📱 **الرقم:** `{phone}`\n"
-                    f"🔑 **رمز التفعيل:** `{code}`\n\n"
-                    f"⏱️ الرقم صالح لمدة 20 دقيقة\n"
-                    f"📨 سيتم إعلامك عند وصول رسالة جديدة",
-                    call.message.chat.id,
-                    call.message.message_id,
-                    parse_mode='Markdown'
-                )
-                
-                # مسح بيانات المستخدم
+                # مسح بيانات المستخدم بعد الشراء
                 if user_id in user_data:
                     del user_data[user_id]
             
