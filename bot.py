@@ -248,19 +248,25 @@ def setup_bot(bot):
                 )
                 
                 # محاولة جلب الأسعار من API
-                prices = {}
-                if api_client:
-                    try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        prices_data = loop.run_until_complete(api_client.get_prices(service))
-                        loop.close()
-                        
-                        if prices_data and isinstance(prices_data, dict):
-                            prices = prices_data
-                            logger.info(f"تم جلب الأسعار للخدمة {service}: {prices}")
-                    except Exception as e:
-                        logger.error(f"خطأ في جلب الأسعار: {e}")
+prices = {}
+if api_client:
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        prices_data = loop.run_until_complete(api_client.get_prices(service))
+        loop.close()
+        
+        if prices_data and isinstance(prices_data, dict):
+            prices = prices_data
+            logger.info(f"✅ تم جلب الأسعار الحقيقية للخدمة {service}: {len(prices)} دولة")
+            
+            # عرض بعض الأسعار للتحقق
+            for country_code, data in list(prices.items())[:5]:
+                if isinstance(data, dict) and service in data:
+                    price = data[service].get('cost', 'N/A')
+                    logger.info(f"   الدولة {country_code}: ${price}")
+    except Exception as e:
+        logger.error(f"❌ خطأ في جلب الأسعار: {e}")
                 
                 # قائمة موسعة من الدول مع رموزها وأسعارها
                 countries = [
