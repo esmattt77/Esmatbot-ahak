@@ -2,7 +2,6 @@ import telebot
 from telebot import types
 import logging
 import os
-import asyncio
 import random
 from sms_activate_api import HeroSMSAPI
 
@@ -200,11 +199,8 @@ def setup_bot(bot):
             return
         
         try:
-            # استدعاء غير متزامن
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            balance = loop.run_until_complete(api_client.get_balance())
-            loop.close()
+            # استخدام الدالة المتزامنة بدلاً من إنشاء حلقة حدث جديدة
+            balance = api_client.get_balance_sync()
             
             bot.reply_to(message, f"💰 رصيدك الحالي: **{balance}** دولار", parse_mode='Markdown')
         except Exception as e:
@@ -264,10 +260,7 @@ def setup_bot(bot):
         
         if text == '/admin balance' and api_client:
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                balance = loop.run_until_complete(api_client.get_balance())
-                loop.close()
+                balance = api_client.get_balance_sync()
                 bot.reply_to(message, f"💰 رصيد API: {balance} دولار")
             except Exception as e:
                 bot.reply_to(message, f"❌ خطأ: {e}")
@@ -361,10 +354,8 @@ def setup_bot(bot):
                     return
                 
                 try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    balance = loop.run_until_complete(api_client.get_balance())
-                    loop.close()
+                    # استخدام الدالة المتزامنة بدلاً من إنشاء حلقة حدث جديدة
+                    balance = api_client.get_balance_sync()
                     
                     bot.edit_message_text(
                         f"💰 رصيدك الحالي: **{balance}** دولار",
@@ -425,13 +416,11 @@ def setup_bot(bot):
                     parse_mode='Markdown'
                 )
                 
-                # محاولة جلب الأسعار من API
+                # محاولة جلب الأسعار من API باستخدام الدالة المتزامنة
                 if api_client:
                     try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        prices_data = loop.run_until_complete(api_client.get_prices(service))
-                        loop.close()
+                        # استخدام الدالة المتزامنة بدلاً من إنشاء حلقة حدث جديدة
+                        prices_data = api_client.get_prices_sync(service)
                         
                         # تحديث الأسعار إذا توفرت
                         if prices_data and isinstance(prices_data, dict):
@@ -532,16 +521,11 @@ def setup_bot(bot):
                 # محاولة طلب رقم حقيقي من API
                 if api_client:
                     try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        
                         # تحويل رمز الدولة إلى رقم صحيح
                         country_int = int(country) if country.isdigit() else 6
                         
-                        number_data = loop.run_until_complete(
-                            api_client.get_number(service, country_int)
-                        )
-                        loop.close()
+                        # استخدام الدالة المتزامنة بدلاً من إنشاء حلقة حدث جديدة
+                        number_data = api_client.get_number_sync(service, country_int)
                         
                         # تسجيل الاستجابة للتصحيح
                         logger.info(f"📞 استجابة get_number: {number_data}")
