@@ -1,8 +1,8 @@
 import os
 import logging
 from flask import Flask, request
-from bot import bot, setup_bot
 import telebot
+from bot import setup_bot
 
 # إعداد التسجيل
 logging.basicConfig(
@@ -23,7 +23,7 @@ if not TELEGRAM_BOT_TOKEN or not WEBHOOK_URL:
 # تهيئة البوت (بدون threading)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, threaded=False)
 
-# إعداد معالجات البوت
+# إعداد معالجات البوت - تمرير البوت كمعامل
 setup_bot(bot)
 
 # إنشاء تطبيق Flask
@@ -48,15 +48,35 @@ def webhook():
 
 @app.route('/', methods=['GET'])
 def index():
-    return """
+    """الصفحة الرئيسية"""
+    return f"""
     <html>
-        <head><title>بوت بيع الأرقام</title></head>
-        <body style="font-family: Arial; text-align: center; padding: 50px;">
-            <h1>🤖 بوت بيع الأرقام يعمل بنجاح!</h1>
-            <p>تم تعيين Webhook ✅</p>
+        <head>
+            <title>بوت بيع الأرقام</title>
+            <meta charset="UTF-8">
+            <style>
+                body {{ font-family: Arial; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }}
+                .container {{ background: rgba(255,255,255,0.1); padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto; }}
+                h1 {{ color: #fff; font-size: 2.5em; }}
+                .status {{ font-size: 1.2em; margin: 20px 0; }}
+                .info {{ opacity: 0.9; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🤖 بوت بيع الأرقام الافتراضية</h1>
+                <p class="status">✅ البوت يعمل بنجاح!</p>
+                <p class="info">تم تعيين Webhook على: <code>/{TELEGRAM_BOT_TOKEN}</code></p>
+                <p class="info">أرسل <strong>/start</strong> للبوت في Telegram</p>
+            </div>
         </body>
     </html>
     """
+
+@app.route('/health', methods=['GET'])
+def health():
+    """نقطة نهاية فحص الصحة"""
+    return {"status": "healthy", "bot": "running"}, 200
 
 if __name__ == '__main__':
     logger.info("🚀 جاري تشغيل البوت...")
@@ -70,6 +90,7 @@ if __name__ == '__main__':
     except Exception as e:
         logger.warning(f"⚠️ فشل حذف webhook القديم: {e}")
     
+    # تعيين webhook جديد
     bot.set_webhook(url=webhook_url_full)
     logger.info(f"✅ تم تعيين webhook على: {webhook_url_full}")
     
