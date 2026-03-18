@@ -52,7 +52,47 @@ class HeroSMSAPI:
         return 0.0
     
     async def get_number(self, service: str, country: int = 6) -> Optional[Dict[str, Any]]:
-        """طلب رقم جديد للخدمة المحددة"""
+        """
+        طلب رقم جديد للخدمة المحددة
+        تعيد dict بالصيغة: {'activationId': '123456', 'phoneNumber': '79584******'}
+        """
+        params = {
+            'action': 'getNumber',
+            'service': service,
+            'country': country
+        }
+        
+        try:
+            session = await self._get_session()
+            params['api_key'] = self.api_key
+            
+            async with session.get(self.BASE_URL, params=params) as response:
+                if response.status == 200:
+                    text = await response.text()
+                    logger.info(f"استجابة getNumber: {text}")
+                    
+                    # تحليل الاستجابة - الصيغة: ACCESS_NUMBER:123456789:79584******
+                    if text.startswith('ACCESS_NUMBER:'):
+                        parts = text.split(':')
+                        if len(parts) >= 3:
+                            activation_id = parts[1]
+                            phone_number = parts[2]
+                            return {
+                                'activationId': activation_id,
+                                'phoneNumber': phone_number
+                            }
+                    else:
+                        logger.error(f"استجابة غير متوقعة: {text}")
+                        return None
+                else:
+                    logger.error(f"خطأ في طلب الرقم: {response.status}")
+                    return None
+        except Exception as e:
+            logger.error(f"استثناء في طلب الرقم: {e}")
+            return None
+    
+    async def get_number_v2(self, service: str, country: int = 6) -> Optional[Dict[str, Any]]:
+        """نسخة V2 من طلب الرقم (ترجع JSON)"""
         params = {
             'action': 'getNumberV2',
             'service': service,
@@ -67,22 +107,11 @@ class HeroSMSAPI:
                 if response.status == 200:
                     return await response.json()
                 else:
-                    logger.error(f"خطأ في طلب الرقم: {response.status}")
+                    logger.error(f"خطأ في طلب الرقم V2: {response.status}")
                     return None
         except Exception as e:
-            logger.error(f"استثناء في طلب الرقم: {e}")
+            logger.error(f"استثناء في طلب الرقم V2: {e}")
             return None
-    
-    async def set_status(self, activation_id: int, status: int) -> bool:
-        """تغيير حالة التفعيل"""
-        params = {
-            'action': 'setStatus',
-            'id': activation_id,
-            'status': status
-        }
-        
-        result = await self._make_request(params)
-        return result == 'ACCESS_READY'
     
     async def get_status(self, activation_id: int) -> str:
         """الحصول على حالة التفعيل"""
@@ -92,6 +121,17 @@ class HeroSMSAPI:
         }
         
         return await self._make_request(params)
+    
+    async def set_status(self, activation_id: int, status: int) -> bool:
+        """تغيير حالة التفعيل (3: طلب إعادة SMS, 6: إكمال, 8: إلغاء)"""
+        params = {
+            'action': 'setStatus',
+            'id': activation_id,
+            'status': status
+        }
+        
+        result = await self._make_request(params)
+        return result == 'ACCESS_READY'
     
     async def get_services(self) -> List[Dict[str, str]]:
         """الحصول على قائمة الخدمات المتاحة"""
@@ -126,28 +166,20 @@ class HeroSMSAPI:
             
             async with session.get(self.BASE_URL, params=params) as response:
                 if response.status == 200:
-                    # محاولة قراءة JSON مباشرة
+                    text = await response.text()
+                    # محاولة تحليل JSON
                     try:
-                        data = await response.json()
-                        logger.info(f"تم جلب الأسعار بنجاح: {len(data)} دولة")
+                        data = json.loads(text)
+                        logger.info(f"✅ تم جلب الأسعار بنجاح: {len(data)} دولة")
                         return data
-                    except:
-                        # إذا فشل JSON، حاول قراءة نص
-                        text = await response.text()
-                        logger.warning(f"استجابة غير JSON: {text[:100]}...")
-                        
-                        # محاولة تحليل JSON من النص
-                        try:
-                            import json
-                            data = json.loads(text)
-                            return data
-                        except:
-                            return {}
+                    except json.JSONDecodeError:
+                        logger.error(f"❌ فشل تحليل JSON: {text[:200]}")
+                        return {}
                 else:
-                    logger.error(f"خطأ في جلب الأسعار: {response.status}")
+                    logger.error(f"❌ خطأ في جلب الأسعار: {response.status}")
                     return {}
         except Exception as e:
-            logger.error(f"استثناء في جلب الأسعار: {e}")
+            logger.error(f"❌ استثناء في جلب الأسعار: {e}")
             return {}
     
     async def get_countries(self) -> List[Dict]:
