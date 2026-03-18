@@ -15,22 +15,22 @@ class HeroSMSAPI:
         
     async def _get_session(self):
         """إنشاء جلسة HTTP إذا لم تكن موجودة"""
-        if self.session is None:
+        if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession()
         return self.session
     
     async def close(self):
         """إغلاق جلسة HTTP"""
-        if self.session:
+        if self.session and not self.session.closed:
             await self.session.close()
             self.session = None
     
     async def _make_request(self, params: Dict[str, Any]) -> str:
         """إجراء طلب إلى API"""
-        session = await self._get_session()
-        params['api_key'] = self.api_key
-        
         try:
+            session = await self._get_session()
+            params['api_key'] = self.api_key
+            
             async with session.get(self.BASE_URL, params=params) as response:
                 if response.status == 200:
                     return await response.text()
@@ -58,15 +58,13 @@ class HeroSMSAPI:
             'country': country
         }
         
-        # استخدام getNumberV2 للحصول على استجابة JSON
-        session = await self._get_session()
-        params['api_key'] = self.api_key
-        
         try:
+            session = await self._get_session()
+            params['api_key'] = self.api_key
+            
             async with session.get(self.BASE_URL, params=params) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    return data
+                    return await response.json()
                 else:
                     logger.error(f"خطأ في طلب الرقم: {response.status}")
                     return None
@@ -97,10 +95,11 @@ class HeroSMSAPI:
     async def get_services(self) -> List[Dict[str, str]]:
         """الحصول على قائمة الخدمات المتاحة"""
         params = {'action': 'getServicesList'}
-        session = await self._get_session()
-        params['api_key'] = self.api_key
         
         try:
+            session = await self._get_session()
+            params['api_key'] = self.api_key
+            
             async with session.get(self.BASE_URL, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -117,10 +116,10 @@ class HeroSMSAPI:
         if service:
             params['service'] = service
             
-        session = await self._get_session()
-        params['api_key'] = self.api_key
-        
         try:
+            session = await self._get_session()
+            params['api_key'] = self.api_key
+            
             async with session.get(self.BASE_URL, params=params) as response:
                 if response.status == 200:
                     return await response.json()
