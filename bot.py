@@ -3,6 +3,7 @@ from telebot import types
 import logging
 import os
 import random
+import time
 from sms_activate_api import HeroSMSAPI
 
 logger = logging.getLogger(__name__)
@@ -199,9 +200,7 @@ def setup_bot(bot):
             return
         
         try:
-            # استخدام الدالة المتزامنة بدلاً من إنشاء حلقة حدث جديدة
-            balance = api_client.get_balance_sync()
-            
+            balance = api_client.get_balance()
             bot.reply_to(message, f"💰 رصيدك الحالي: **{balance}** دولار", parse_mode='Markdown')
         except Exception as e:
             logger.error(f"خطأ في جلب الرصيد: {e}")
@@ -260,7 +259,7 @@ def setup_bot(bot):
         
         if text == '/admin balance' and api_client:
             try:
-                balance = api_client.get_balance_sync()
+                balance = api_client.get_balance()
                 bot.reply_to(message, f"💰 رصيد API: {balance} دولار")
             except Exception as e:
                 bot.reply_to(message, f"❌ خطأ: {e}")
@@ -354,9 +353,7 @@ def setup_bot(bot):
                     return
                 
                 try:
-                    # استخدام الدالة المتزامنة بدلاً من إنشاء حلقة حدث جديدة
-                    balance = api_client.get_balance_sync()
-                    
+                    balance = api_client.get_balance()
                     bot.edit_message_text(
                         f"💰 رصيدك الحالي: **{balance}** دولار",
                         call.message.chat.id,
@@ -416,21 +413,24 @@ def setup_bot(bot):
                     parse_mode='Markdown'
                 )
                 
-                # محاولة جلب الأسعار من API باستخدام الدالة المتزامنة
+                # محاولة جلب الأسعار من API
+                prices = {}
                 if api_client:
                     try:
-                        # استخدام الدالة المتزامنة بدلاً من إنشاء حلقة حدث جديدة
-                        prices_data = api_client.get_prices_sync(service)
-                        
-                        # تحديث الأسعار إذا توفرت
+                        prices_data = api_client.get_prices(service)
                         if prices_data and isinstance(prices_data, dict):
-                            for country in COUNTRIES:
-                                code = country['code']
-                                if code in prices_data and isinstance(prices_data[code], dict) and service in prices_data[code]:
-                                    country['price'] = prices_data[code][service].get('cost', country['price'])
-                            logger.info(f"✅ تم تحديث الأسعار للخدمة {service}")
+                            prices = prices_data
+                            logger.info(f"✅ تم جلب الأسعار للخدمة {service}: {len(prices)} دولة")
                     except Exception as e:
                         logger.error(f"❌ خطأ في جلب الأسعار: {e}")
+                        prices = {}
+                
+                # تحديث الأسعار في قائمة COUNTRIES
+                if prices:
+                    for country in COUNTRIES:
+                        code = country['code']
+                        if code in prices and isinstance(prices[code], dict) and service in prices[code]:
+                            country['price'] = prices[code][service].get('cost', country['price'])
                 
                 # عرض الصفحة الأولى من الدول
                 show_countries_page(call, service, service_name, 0)
@@ -511,6 +511,7 @@ def setup_bot(bot):
                 country_flag = user_info.get('country_flag', '🇷🇺')
                 price = user_info.get('price', 0.5)
                 
+                # رسالة انتظار
                 bot.edit_message_text(
                     "🔄 **جاري طلب الرقم...**\n\nالرجاء الانتظار",
                     call.message.chat.id,
@@ -518,19 +519,14 @@ def setup_bot(bot):
                     parse_mode='Markdown'
                 )
                 
-                # محاولة طلب رقم حقيقي من API
+                # محاولة طلب رقم من API
                 if api_client:
                     try:
-                        # تحويل رمز الدولة إلى رقم صحيح
                         country_int = int(country) if country.isdigit() else 6
+                        number_data = api_client.get_number(service, country_int)
                         
-                        # استخدام الدالة المتزامنة بدلاً من إنشاء حلقة حدث جديدة
-                        number_data = api_client.get_number_sync(service, country_int)
-                        
-                        # تسجيل الاستجابة للتصحيح
                         logger.info(f"📞 استجابة get_number: {number_data}")
                         
-                        # تحقق من نجاح العملية
                         if number_data and number_data.get('success', False):
                             phone = number_data.get('phoneNumber')
                             activation_id = number_data.get('activationId')
@@ -549,12 +545,9 @@ def setup_bot(bot):
                                 parse_mode='Markdown'
                             )
                         else:
-                            # عرض رسالة خطأ واضحة
                             error_msg = "فشل الاتصال بـ API"
-                            if number_data and number_data.get('error') == 'no_numbers':
-                                error_msg = "لا توجد أرقام متاحة حالياً"
-                            elif number_data and number_data.get('error') == 'no_balance':
-                                error_msg = "رصيد API غير كافٍ"
+                            if number_data and number_data.get('message'):
+                                error_msg = number_data.get('message')
                             
                             bot.edit_message_text(
                                 f"❌ **فشل شراء الرقم**\n\n"
@@ -562,25 +555,19 @@ def setup_bot(bot):
                                 f"💰 السعر: ${price:.2f}\n"
                                 f"🌍 الدولة: {country_flag} {country_name}\n"
                                 f"📱 الخدمة: {service_name}\n\n"
-                                f"⚠️ يرجى المحاولة لاحقاً أو اختيار دولة أخرى",
+                                f"⚠️ يرجى المحاولة لاحقاً",
                                 call.message.chat.id,
                                 call.message.message_id,
                                 parse_mode='Markdown'
                             )
-                            
                     except Exception as e:
-                        logger.error(f"خطأ في طلب الرقم من API: {e}")
-                        
-                        # استخدام رقم وهمي في حالة الخطأ
-                        phone = f"+7 (9{random.randint(10, 99)}) {random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(10, 99)}"
-                        
+                        logger.error(f"خطأ في طلب الرقم: {e}")
                         bot.edit_message_text(
-                            f"✅ **تمت العملية بنجاح! (تجريبي)**\n\n"
-                            f"📱 **الرقم:** `{phone}`\n"
-                            f"💰 **السعر:** ${price:.2f}\n"
-                            f"🌍 **الدولة:** {country_flag} {country_name}\n"
-                            f"📱 **الخدمة:** {service_name}\n\n"
-                            f"⚠️ هذا رقم تجريبي (خطأ: {str(e)[:50]}...)",
+                            f"❌ **فشل شراء الرقم**\n\n"
+                            f"السبب: خطأ تقني\n\n"
+                            f"💰 السعر: ${price:.2f}\n"
+                            f"🌍 الدولة: {country_flag} {country_name}\n"
+                            f"📱 الخدمة: {service_name}",
                             call.message.chat.id,
                             call.message.message_id,
                             parse_mode='Markdown'
