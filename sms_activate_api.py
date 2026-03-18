@@ -2,6 +2,7 @@ import aiohttp
 import logging
 from typing import Optional, Dict, Any, List
 import json
+from async_utils import async_loop
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,9 @@ class HeroSMSAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.session = None
-        
+        # بدء حلقة الأحداث عند إنشاء الكائن
+        async_loop.start()
+    
     async def _get_session(self):
         """إنشاء جلسة HTTP إذا لم تكن موجودة"""
         if self.session is None or self.session.closed:
@@ -42,14 +45,22 @@ class HeroSMSAPI:
             logger.error(f"استثناء في الطلب: {e}")
             return f"ERROR:EXCEPTION"
     
+    def get_balance_sync(self) -> float:
+        """نسخة متزامنة من get_balance"""
+        return async_loop.run_coroutine(self.get_balance())
+    
     async def get_balance(self) -> float:
-        """الحصول على الرصيد الحالي - هذه تعمل بشكل صحيح"""
+        """الحصول على الرصيد الحالي"""
         result = await self._make_request({'action': 'getBalance'})
         
         if result.startswith('ACCESS_BALANCE:'):
             balance_str = result.split(':')[1]
             return float(balance_str)
         return 0.0
+    
+    def get_number_sync(self, service: str, country: int = 6) -> Optional[Dict[str, Any]]:
+        """نسخة متزامنة من get_number"""
+        return async_loop.run_coroutine(self.get_number(service, country))
     
     async def get_number(self, service: str, country: int = 6) -> Optional[Dict[str, Any]]:
         """
@@ -94,109 +105,28 @@ class HeroSMSAPI:
             logger.error(f"❌ استثناء في طلب الرقم: {e}")
             return {'error': str(e), 'success': False}
     
-    async def get_number_v2(self, service: str, country: int = 6) -> Optional[Dict[str, Any]]:
-        """نسخة V2 من طلب الرقم (ترجع JSON)"""
-        params = {
-            'action': 'getNumberV2',
-            'service': service,
-            'country': country
-        }
-        
-        try:
-            session = await self._get_session()
-            params['api_key'] = self.api_key
-            
-            async with session.get(self.BASE_URL, params=params) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    logger.error(f"خطأ في طلب الرقم V2: {response.status}")
-                    return None
-        except Exception as e:
-            logger.error(f"استثناء في طلب الرقم V2: {e}")
-            return None
-    
-    async def get_status(self, activation_id: int) -> str:
-        """الحصول على حالة التفعيل"""
-        params = {
-            'action': 'getStatus',
-            'id': activation_id
-        }
-        
-        return await self._make_request(params)
-    
-    async def set_status(self, activation_id: int, status: int) -> bool:
-        """تغيير حالة التفعيل (3: طلب إعادة SMS, 6: إكمال, 8: إلغاء)"""
-        params = {
-            'action': 'setStatus',
-            'id': activation_id,
-            'status': status
-        }
-        
-        result = await self._make_request(params)
-        return result == 'ACCESS_READY'
-    
-    async def get_services(self) -> List[Dict[str, str]]:
-        """الحصول على قائمة الخدمات المتاحة"""
-        params = {'action': 'getServicesList'}
-        
-        try:
-            session = await self._get_session()
-            params['api_key'] = self.api_key
-            
-            async with session.get(self.BASE_URL, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data.get('status') == 'success':
-                        return data.get('services', [])
-                return []
-        except Exception as e:
-            logger.error(f"خطأ في جلب الخدمات: {e}")
-            return []
+    def get_prices_sync(self, service: str = None) -> Dict:
+        """نسخة متزامنة من get_prices"""
+        return async_loop.run_coroutine(self.get_prices(service))
     
     async def get_prices(self, service: str = None) -> Dict:
-        """
-        الحصول على الأسعار الحقيقية من API
-        ترجع قاموساً برموز الدول وأسعارها
-        """
+        """الحصول على الأسعار الحقيقية من API"""
         params = {'action': 'getPrices'}
         if service:
             params['service'] = service
             
         try:
-            session = await self._get_session()
-            params['api_key'] = self.api_key
+            result = await self._make_request(params)
+            if result.startswith('ERROR'):
+                return {}
             
-            async with session.get(self.BASE_URL, params=params) as response:
-                if response.status == 200:
-                    text = await response.text()
-                    # محاولة تحليل JSON
-                    try:
-                        data = json.loads(text)
-                        logger.info(f"✅ تم جلب الأسعار بنجاح: {len(data)} دولة")
-                        return data
-                    except json.JSONDecodeError:
-                        logger.error(f"❌ فشل تحليل JSON: {text[:200]}")
-                        return {}
-                else:
-                    logger.error(f"❌ خطأ في جلب الأسعار: {response.status}")
-                    return {}
+            try:
+                data = json.loads(result)
+                logger.info(f"✅ تم جلب الأسعار بنجاح: {len(data)} دولة")
+                return data
+            except json.JSONDecodeError:
+                logger.error(f"❌ فشل تحليل JSON: {result[:200]}")
+                return {}
         except Exception as e:
             logger.error(f"❌ استثناء في جلب الأسعار: {e}")
             return {}
-    
-    async def get_countries(self) -> List[Dict]:
-        """الحصول على قائمة الدول المتاحة"""
-        params = {'action': 'getCountries'}
-        
-        try:
-            session = await self._get_session()
-            params['api_key'] = self.api_key
-            
-            async with session.get(self.BASE_URL, params=params) as response:
-                if response.status == 200:
-                    return await response.json()
-                return []
-        except Exception as e:
-            logger.error(f"خطأ في جلب الدول: {e}")
-            return []
