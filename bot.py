@@ -247,7 +247,7 @@ def setup_bot(bot):
                     parse_mode='Markdown'
                 )
                 
-                # محاولة جلب الأسعار من API
+# محاولة جلب الأسعار من API
 prices = {}
 if api_client:
     try:
