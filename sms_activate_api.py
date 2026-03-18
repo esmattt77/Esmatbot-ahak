@@ -1,6 +1,7 @@
 import aiohttp
 import logging
 from typing import Optional, Dict, Any, List
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,10 @@ class HeroSMSAPI:
             return []
     
     async def get_prices(self, service: str = None) -> Dict:
-        """الحصول على الأسعار"""
+        """
+        الحصول على الأسعار الحقيقية من API
+        ترجع قاموساً برموز الدول وأسعارها
+        """
         params = {'action': 'getPrices'}
         if service:
             params['service'] = service
@@ -122,8 +126,42 @@ class HeroSMSAPI:
             
             async with session.get(self.BASE_URL, params=params) as response:
                 if response.status == 200:
-                    return await response.json()
-                return {}
+                    # محاولة قراءة JSON مباشرة
+                    try:
+                        data = await response.json()
+                        logger.info(f"تم جلب الأسعار بنجاح: {len(data)} دولة")
+                        return data
+                    except:
+                        # إذا فشل JSON، حاول قراءة نص
+                        text = await response.text()
+                        logger.warning(f"استجابة غير JSON: {text[:100]}...")
+                        
+                        # محاولة تحليل JSON من النص
+                        try:
+                            import json
+                            data = json.loads(text)
+                            return data
+                        except:
+                            return {}
+                else:
+                    logger.error(f"خطأ في جلب الأسعار: {response.status}")
+                    return {}
         except Exception as e:
-            logger.error(f"خطأ في جلب الأسعار: {e}")
+            logger.error(f"استثناء في جلب الأسعار: {e}")
             return {}
+    
+    async def get_countries(self) -> List[Dict]:
+        """الحصول على قائمة الدول المتاحة"""
+        params = {'action': 'getCountries'}
+        
+        try:
+            session = await self._get_session()
+            params['api_key'] = self.api_key
+            
+            async with session.get(self.BASE_URL, params=params) as response:
+                if response.status == 200:
+                    return await response.json()
+                return []
+        except Exception as e:
+            logger.error(f"خطأ في جلب الدول: {e}")
+            return []
