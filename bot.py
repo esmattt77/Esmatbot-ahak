@@ -46,6 +46,9 @@ class NumberSellingBot:
     def _setup_handlers(self):
         """إعداد معالجات الأوامر"""
         
+        # معالج الأزرار العام - ضعه في الأعلى لالتقاط جميع الأزرار
+        self.application.add_handler(CallbackQueryHandler(self.button_handler))
+        
         # أمر البدء
         self.application.add_handler(CommandHandler("start", self.start_command))
         
@@ -61,18 +64,26 @@ class NumberSellingBot:
         # أوامر المشرفين
         self.application.add_handler(CommandHandler("admin", self.admin_command, filters=filters.User(user_id=self.admin_ids)))
         
-        # معالج الأزرار
-        self.application.add_handler(CallbackQueryHandler(self.button_handler))
-        
-        # محادثة شراء رقم
+        # محادثة شراء رقم - مع تحسين الإعدادات
         conv_handler = ConversationHandler(
-            entry_points=[CallbackQueryHandler(self.service_selection, pattern="^buy_number$")],
+            entry_points=[
+                CommandHandler("buy", self.buy_command),
+                CallbackQueryHandler(self.service_selection, pattern="^buy_number$")
+            ],
             states={
                 SERVICE_SELECTION: [CallbackQueryHandler(self.country_selection, pattern="^service_")],
                 COUNTRY_SELECTION: [CallbackQueryHandler(self.confirm_purchase, pattern="^country_")],
                 CONFIRM_PURCHASE: [CallbackQueryHandler(self.process_purchase, pattern="^(confirm|cancel)_")]
             },
-            fallbacks=[CommandHandler("cancel", self.cancel)]
+            fallbacks=[
+                CommandHandler("cancel", self.cancel),
+                CallbackQueryHandler(self.fallback_handler, pattern="^back_to_main$")
+            ],
+            name="buy_number_conversation",
+            persistent=False,
+            per_user=True,
+            per_chat=True,
+            per_message=False  # مهم: per_message=False للسماح بمعالجة الأزرار بشكل صحيح
         )
         self.application.add_handler(conv_handler)
     
@@ -203,9 +214,11 @@ class NumberSellingBot:
                 await update.message.reply_text("❌ لا توجد خدمات متاحة")
     
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """معالج الضغط على الأزرار"""
+        """معالج الضغط على الأزرار العامة (خارج المحادثة)"""
         query = update.callback_query
-        await query.answer()
+        await query.answer()  # مهم جداً: استخدم await
+        
+        logger.info(f"تم الضغط على زر: {query.data} من المستخدم {update.effective_user.id}")
         
         if query.data == "check_balance":
             try:
@@ -215,18 +228,48 @@ class NumberSellingBot:
                     parse_mode='Markdown'
                 )
             except Exception as e:
+                logger.error(f"خطأ في جلب الرصيد: {e}")
                 await query.edit_message_text("❌ حدث خطأ في جلب الرصيد")
         
         elif query.data == "show_help":
-            await self.help_command(update, context)
+            # إنشاء رسالة مساعدة مبسطة
+            help_text = """
+❓ **مساعدة سريعة**
+
+• /buy - لشراء رقم جديد
+• /balance - لعرض الرصيد
+• /start - القائمة الرئيسية
+
+للمساعدة التفصيلية، أرسل /help
+            """
+            await query.edit_message_text(help_text, parse_mode='Markdown')
         
         elif query.data == "back_to_main":
-            await self.start_command(update, context)
+            # العودة للقائمة الرئيسية
+            keyboard = [
+                [InlineKeyboardButton("📱 شراء رقم", callback_data="buy_number")],
+                [InlineKeyboardButton("💰 رصيدي", callback_data="check_balance")],
+                [InlineKeyboardButton("❓ مساعدة", callback_data="show_help")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "👫 **القائمة الرئيسية**\n\nاختر ما تريد:",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+        
+        elif query.data == "buy_number":
+            # بدء محادثة الشراء
+            await self.service_selection(update, context)
+        
+        else:
+            await query.edit_message_text("❓ زر غير معروف. الرجاء استخدام الأزرار المتاحة.")
     
     async def service_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """اختيار الخدمة"""
         query = update.callback_query
-        await query.answer()
+        await query.answer()  # مهم جداً!
         
         service_code = query.data.replace("service_", "")
         context.user_data['selected_service'] = service_code
@@ -242,12 +285,14 @@ class NumberSellingBot:
         
         keyboard = []
         for country_code, country_name in countries.items():
+            # إضافة الأعلام التوضيحية
+            flag = "🇷🇺" if country_code == '6' else "🇰🇿" if country_code == '2' else "🇺🇦" if country_code == '1' else "🌍"
             keyboard.append([InlineKeyboardButton(
-                f"🇷🇺 {country_name}" if country_code == '6' else f"🇰🇿 {country_name}" if country_code == '2' else f"🇺🇦 {country_name}" if country_code == '1' else f"🌍 {country_name}",
+                f"{flag} {country_name}",
                 callback_data=f"country_{country_code}"
             )])
         
-        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="buy_number")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_to_main")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
@@ -262,14 +307,15 @@ class NumberSellingBot:
     async def country_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """اختيار الدولة"""
         query = update.callback_query
-        await query.answer()
+        await query.answer()  # مهم جداً!
         
         country_code = query.data.replace("country_", "")
         context.user_data['selected_country'] = int(country_code)
         
-        # عرض تأكيد الشراء مع السعر التقريبي
-        service = context.user_data['selected_service']
+        # تحديد اسم الدولة للعرض
+        country_name = "روسيا" if context.user_data['selected_country'] == 6 else "كازاخستان" if context.user_data['selected_country'] == 2 else "أوكرانيا" if context.user_data['selected_country'] == 1 else "جميع الدول"
         
+        # عرض تأكيد الشراء مع السعر التقريبي
         keyboard = [
             [
                 InlineKeyboardButton("✅ تأكيد الشراء", callback_data="confirm_purchase"),
@@ -281,7 +327,7 @@ class NumberSellingBot:
         await query.edit_message_text(
             f"📱 **تفاصيل الطلب**\n\n"
             f"الخدمة: {context.user_data['service_name']}\n"
-            f"الدولة: {'روسيا' if context.user_data['selected_country'] == 6 else 'كازاخستان'}\n"
+            f"الدولة: {country_name}\n"
             f"السعر التقريبي: 0.5 - 2 دولار\n\n"
             f"⚠️ هل تريد تأكيد الشراء؟",
             reply_markup=reply_markup,
@@ -381,6 +427,33 @@ class NumberSellingBot:
         
         return ConversationHandler.END
     
+    async def fallback_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج للأزرار التي لا تنتمي لمحادثة محددة"""
+        query = update.callback_query
+        await query.answer()
+        
+        logger.info(f"fallback_handler تم استدعاؤه مع: {query.data}")
+        
+        if query.data == "back_to_main":
+            # العودة للقائمة الرئيسية
+            keyboard = [
+                [InlineKeyboardButton("📱 شراء رقم", callback_data="buy_number")],
+                [InlineKeyboardButton("💰 رصيدي", callback_data="check_balance")],
+                [InlineKeyboardButton("❓ مساعدة", callback_data="show_help")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "👫 **القائمة الرئيسية**\n\nاختر ما تريد:",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+        else:
+            await query.edit_message_text(
+                "❌ حدث خطأ. الرجاء استخدام الأزرار المتاحة أو إرسال /start",
+                parse_mode='Markdown'
+            )
+    
     async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """إلغاء المحادثة"""
         await update.message.reply_text(
@@ -408,21 +481,3 @@ class NumberSellingBot:
             # سيتم تطبيق هذا الجزء لاحقاً عند إضافة قاعدة بيانات
         
         return {"status": "ok"}
-    
-    async def run_webhook(self, webhook_url: str, port: int):
-        """تشغيل البوت باستخدام Webhook"""
-        await self.application.bot.set_webhook(url=f"{webhook_url}/webhook")
-        logger.info(f"Webhook تم تعيينه على: {webhook_url}/webhook")
-        
-        # بدء تشغيل البوت مع webhook
-        await self.application.initialize()
-        await self.application.start()
-        
-        # سيتم تشغيل webhook server في app.py
-        
-    async def run_polling(self):
-        """تشغيل البوت باستخدام Polling (للتطوير المحلي)"""
-        await self.application.initialize()
-        await self.application.start()
-        logger.info("بدء تشغيل البوت باستخدام polling...")
-        await self.application.updater.start_polling()
