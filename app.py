@@ -4,10 +4,12 @@ import asyncio
 import logging
 from bot import NumberSellingBot
 from telegram import Update
+import threading
+import time
 
 # إعداد التسجيل
 logging.basicConfig(
-    format='%(asname)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
@@ -23,28 +25,30 @@ WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
 PORT = int(os.environ.get('PORT', 10000))
 
 # تحويل ADMIN_IDS إلى أرقام صحيحة
-admin_ids = [int(a.strip()) for a in ADMIN_IDS if a.strip().isdigit()]
+admin_ids = []
+for admin_id in ADMIN_IDS:
+    admin_id = admin_id.strip()
+    if admin_id and admin_id.isdigit():
+        admin_ids.append(int(admin_id))
 
 # متغيرات عامة
 bot_instance = None
 application = None
 loop = None
+background_thread = None
+bot_ready = False
 
-def initialize_bot():
-    """تهيئة البوت بشكل متزامن"""
-    global bot_instance, application, loop
+def run_bot_forever():
+    """تشغيل البوت في حلقة أحداث دائمة في خيط منفصل"""
+    global bot_instance, application, loop, bot_ready
     
-    logger.info("بدء تهيئة البوت...")
+    logger.info("🚀 بدء تشغيل البوت في الخلفية...")
     
-    if not TELEGRAM_BOT_TOKEN:
-        logger.error("❌ توكن البوت غير موجود!")
-        return False
+    # إنشاء حلقة أحداث جديدة
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
     try:
-        # إنشاء حلقة أحداث جديدة
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
         # إنشاء البوت
         bot_instance = NumberSellingBot(
             token=TELEGRAM_BOT_TOKEN,
@@ -53,7 +57,7 @@ def initialize_bot():
         )
         application = bot_instance.application
         
-        # تهيئة التطبيق أولاً
+        # تهيئة التطبيق
         logger.info("🔄 جاري تهيئة التطبيق...")
         loop.run_until_complete(application.initialize())
         logger.info("✅ تم تهيئة التطبيق")
@@ -71,30 +75,35 @@ def initialize_bot():
         loop.run_until_complete(application.start())
         logger.info("✅ تم بدء التطبيق")
         
-        return True
+        bot_ready = True
+        logger.info("✅ البوت جاهز لاستقبال الأوامر!")
+        
+        # تشغيل حلقة الأحداث إلى الأبد
+        loop.run_forever()
         
     except Exception as e:
-        logger.error(f"❌ فشل تهيئة البوت: {e}")
+        logger.error(f"❌ خطأ في تشغيل البوت: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        bot_ready = False
+    finally:
+        logger.info("🛑 تم إغلاق حلقة الأحداث")
+        if loop and loop.is_running():
+            loop.close()
 
-# تهيئة البوت عند بدء التشغيل
-logger.info("🚀 بدء تشغيل تطبيق Flask...")
-init_success = initialize_bot()
-if init_success:
-    logger.info("✅ البوت جاهز لاستقبال الأوامر!")
-else:
-    logger.error("❌ فشل تهيئة البوت!")
+# بدء تشغيل البوت في خيط منفصل
+background_thread = threading.Thread(target=run_bot_forever, daemon=True)
+background_thread.start()
+logger.info("✅ تم بدء تشغيل البوت في الخلفية")
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """نقطة نهاية Webhook من تلغرام"""
-    global application, loop
+    global application, loop, bot_ready
     
-    if not application:
-        logger.error("❌ التطبيق غير مهيأ!")
-        return jsonify({"error": "Bot not initialized"}), 500
+    if not bot_ready:
+        logger.warning("⚠️ البوت ليس جاهزاً بعد")
+        return jsonify({"error": "Bot not ready"}), 503
     
     try:
         # استلام البيانات
@@ -108,20 +117,14 @@ def webhook():
         # تحويل البيانات إلى كائن Update
         update = Update.de_json(update_data, application.bot)
         
-        # معالجة التحديث في حلقة الأحداث
-        if loop and loop.is_running():
-            # إذا كانت الحلقة تعمل، استخدم run_coroutine_threadsafe
-            future = asyncio.run_coroutine_threadsafe(
-                application.process_update(update),
-                loop
-            )
-            future.result(timeout=10)
-        else:
-            # وإلا، أنشئ حلقة جديدة
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            new_loop.run_until_complete(application.process_update(update))
-            new_loop.close()
+        # معالجة التحديث في حلقة الأحداث - استخدام run_coroutine_threadsafe
+        future = asyncio.run_coroutine_threadsafe(
+            application.process_update(update),
+            loop
+        )
+        
+        # انتظر النتيجة مع مهلة
+        future.result(timeout=30)
         
         logger.info(f"✅ تمت معالجة التحديث: {update_id}")
         return jsonify({"status": "ok"}), 200
@@ -140,42 +143,30 @@ def webhook():
 def index():
     """الصفحة الرئيسية"""
     from datetime import datetime
-    status = "✅ يعمل" if bot_instance and application else "❌ غير نشط"
-    webhook_status = "✅" if application and application.bot else "❌"
-    
-    # معلومات إضافية للتصحيح
-    bot_info = ""
-    if application and application.bot:
-        try:
-            # محاولة جلب معلومات البوت
-            loop2 = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop2)
-            bot_info = loop2.run_until_complete(application.bot.get_me())
-            loop2.close()
-        except:
-            pass
+    status = "✅ يعمل" if bot_ready else "⏳ يبدأ التشغيل..."
     
     return f"""
     <html>
         <head>
             <title>بوت بيع الأرقام</title>
+            <meta charset="UTF-8">
             <style>
-                body {{ font-family: Arial; text-align: center; padding: 50px; background: #f0f0f0; }}
-                .container {{ background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
-                h1 {{ color: #2ecc71; }}
-                .status {{ font-size: 18px; margin: 10px 0; }}
-                .ok {{ color: green; }}
-                .info {{ color: #7f8c8d; }}
+                body {{ font-family: 'Arial', sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }}
+                .container {{ background: rgba(255,255,255,0.1); padding: 40px; border-radius: 15px; backdrop-filter: blur(10px); }}
+                h1 {{ font-size: 2.5em; margin-bottom: 20px; }}
+                .status {{ font-size: 1.2em; margin: 15px 0; }}
+                .ok {{ color: #a8e6cf; }}
+                .wait {{ color: #ffeaa7; }}
             </style>
         </head>
         <body>
             <div class="container">
                 <h1>🤖 بوت بيع الأرقام الافتراضية</h1>
-                <p class="status">حالة البوت: <strong class="ok">{status}</strong></p>
-                <p class="status">تم تعيين Webhook: <strong>{webhook_status}</strong></p>
+                <p class="status">حالة البوت: <strong class="{'ok' if bot_ready else 'wait'}">{status}</strong></p>
                 <p class="info">الوقت: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                 <p class="info">المنفذ: {PORT}</p>
-                <p class="info">البوت جاهز لاستقبال الأوامر 🚀</p>
+                <p class="info">عدد المشرفين: {len(admin_ids)}</p>
+                <p class="info">🚀 البوت جاهز لاستقبال الأوامر</p>
             </div>
         </body>
     </html>
@@ -185,23 +176,10 @@ def index():
 def health():
     """نقطة نهاية فحص الصحة"""
     return jsonify({
-        "status": "healthy",
-        "bot": "active" if bot_instance and application else "inactive",
-        "webhook": "set" if application and application.bot else "not set"
-    }), 200
-
-@app.route('/debug', methods=['GET'])
-def debug():
-    """معلومات التصحيح"""
-    return jsonify({
-        "bot_initialized": bot_instance is not None,
-        "application_initialized": application is not None,
-        "loop_exists": loop is not None,
-        "loop_running": loop.is_running() if loop else False,
-        "admin_ids": admin_ids,
-        "webhook_url": f"{WEBHOOK_URL}/webhook" if WEBHOOK_URL else None
-    })
+        "status": "healthy" if bot_ready else "starting",
+        "bot": "active" if bot_ready else "initializing",
+        "thread": "running" if background_thread and background_thread.is_alive() else "stopped"
+    }), 200 if bot_ready else 503
 
 if __name__ == "__main__":
-    # للتشغيل المحلي فقط
     app.run(host="0.0.0.0", port=PORT, debug=False)
