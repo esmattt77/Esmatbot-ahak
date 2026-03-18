@@ -3,10 +3,6 @@ import logging
 from flask import Flask, request
 import telebot
 from bot import setup_bot
-from async_utils import async_loop
-
-# بدء حلقة الأحداث عند تشغيل التطبيق
-async_loop.start()
 
 # إعداد التسجيل
 logging.basicConfig(
