@@ -262,36 +262,150 @@ def setup_bot(bot):
                     except Exception as e:
                         logger.error(f"خطأ في جلب الأسعار: {e}")
                 
-                # عرض الدول مع الأسعار
-                keyboard = types.InlineKeyboardMarkup(row_width=1)
-                
-                # قائمة الدول مع أسعار (من API أو افتراضية)
+                # قائمة موسعة من الدول مع رموزها وأسعارها
                 countries = [
                     {
                         'code': '6',
                         'name': 'روسيا',
                         'flag': '🇷🇺',
-                        'price': prices.get('6', {}).get('cost', 0.5) if prices else 0.5
+                        'price': prices.get('6', {}).get('cost', 0.50) if prices else 0.50
                     },
                     {
                         'code': '2',
                         'name': 'كازاخستان',
                         'flag': '🇰🇿',
-                        'price': prices.get('2', {}).get('cost', 0.8) if prices else 0.8
+                        'price': prices.get('2', {}).get('cost', 0.80) if prices else 0.80
                     },
                     {
                         'code': '1',
                         'name': 'أوكرانيا',
                         'flag': '🇺🇦',
-                        'price': prices.get('1', {}).get('cost', 0.6) if prices else 0.6
+                        'price': prices.get('1', {}).get('cost', 0.60) if prices else 0.60
                     },
                     {
                         'code': '0',
                         'name': 'جميع الدول',
                         'flag': '🌍',
-                        'price': prices.get('0', {}).get('cost', 1.5) if prices else 1.5
+                        'price': prices.get('0', {}).get('cost', 1.50) if prices else 1.50
+                    },
+                    {
+                        'code': '187',
+                        'name': 'مصر',
+                        'flag': '🇪🇬',
+                        'price': prices.get('187', {}).get('cost', 1.20) if prices else 1.20
+                    },
+                    {
+                        'code': '194',
+                        'name': 'السعودية',
+                        'flag': '🇸🇦',
+                        'price': prices.get('194', {}).get('cost', 1.80) if prices else 1.80
+                    },
+                    {
+                        'code': '195',
+                        'name': 'الإمارات',
+                        'flag': '🇦🇪',
+                        'price': prices.get('195', {}).get('cost', 2.00) if prices else 2.00
+                    },
+                    {
+                        'code': '193',
+                        'name': 'الكويت',
+                        'flag': '🇰🇼',
+                        'price': prices.get('193', {}).get('cost', 2.20) if prices else 2.20
+                    },
+                    {
+                        'code': '196',
+                        'name': 'قطر',
+                        'flag': '🇶🇦',
+                        'price': prices.get('196', {}).get('cost', 2.10) if prices else 2.10
+                    },
+                    {
+                        'code': '197',
+                        'name': 'البحرين',
+                        'flag': '🇧🇭',
+                        'price': prices.get('197', {}).get('cost', 2.00) if prices else 2.00
+                    },
+                    {
+                        'code': '198',
+                        'name': 'عمان',
+                        'flag': '🇴🇲',
+                        'price': prices.get('198', {}).get('cost', 1.90) if prices else 1.90
+                    },
+                    {
+                        'code': '3',
+                        'name': 'إندونيسيا',
+                        'flag': '🇮🇩',
+                        'price': prices.get('3', {}).get('cost', 1.10) if prices else 1.10
+                    },
+                    {
+                        'code': '4',
+                        'name': 'الهند',
+                        'flag': '🇮🇳',
+                        'price': prices.get('4', {}).get('cost', 0.90) if prices else 0.90
+                    },
+                    {
+                        'code': '5',
+                        'name': 'الفلبين',
+                        'flag': '🇵🇭',
+                        'price': prices.get('5', {}).get('cost', 1.30) if prices else 1.30
+                    },
+                    {
+                        'code': '7',
+                        'name': 'فيتنام',
+                        'flag': '🇻🇳',
+                        'price': prices.get('7', {}).get('cost', 1.00) if prices else 1.00
+                    },
+                    {
+                        'code': '8',
+                        'name': 'الصين',
+                        'flag': '🇨🇳',
+                        'price': prices.get('8', {}).get('cost', 1.40) if prices else 1.40
+                    },
+                    {
+                        'code': '9',
+                        'name': 'الولايات المتحدة',
+                        'flag': '🇺🇸',
+                        'price': prices.get('9', {}).get('cost', 2.50) if prices else 2.50
+                    },
+                    {
+                        'code': '10',
+                        'name': 'بريطانيا',
+                        'flag': '🇬🇧',
+                        'price': prices.get('10', {}).get('cost', 2.30) if prices else 2.30
+                    },
+                    {
+                        'code': '11',
+                        'name': 'ألمانيا',
+                        'flag': '🇩🇪',
+                        'price': prices.get('11', {}).get('cost', 2.20) if prices else 2.20
+                    },
+                    {
+                        'code': '12',
+                        'name': 'فرنسا',
+                        'flag': '🇫🇷',
+                        'price': prices.get('12', {}).get('cost', 2.10) if prices else 2.10
+                    },
+                    {
+                        'code': '13',
+                        'name': 'إسبانيا',
+                        'flag': '🇪🇸',
+                        'price': prices.get('13', {}).get('cost', 2.00) if prices else 2.00
+                    },
+                    {
+                        'code': '14',
+                        'name': 'إيطاليا',
+                        'flag': '🇮🇹',
+                        'price': prices.get('14', {}).get('cost', 2.00) if prices else 2.00
+                    },
+                    {
+                        'code': '15',
+                        'name': 'تركيا',
+                        'flag': '🇹🇷',
+                        'price': prices.get('15', {}).get('cost', 1.70) if prices else 1.70
                     }
                 ]
+                
+                # عرض الدول مع الأسعار (صفين في كل سطر لعرض أكثر)
+                keyboard = types.InlineKeyboardMarkup(row_width=2)
                 
                 for country in countries:
                     button_text = f"{country['flag']} {country['name']} - ${country['price']:.2f}"
@@ -318,26 +432,83 @@ def setup_bot(bot):
                 service = user_data.get(user_id, {}).get('service', 'tg')
                 service_name = user_data.get(user_id, {}).get('service_name', 'تلغرام')
                 
-                # أسعار الدول
+                # أسعار الدول (موسعة)
                 country_prices = {
                     '6': 0.50,
                     '2': 0.80,
                     '1': 0.60,
-                    '0': 1.50
+                    '0': 1.50,
+                    '187': 1.20,
+                    '194': 1.80,
+                    '195': 2.00,
+                    '193': 2.20,
+                    '196': 2.10,
+                    '197': 2.00,
+                    '198': 1.90,
+                    '3': 1.10,
+                    '4': 0.90,
+                    '5': 1.30,
+                    '7': 1.00,
+                    '8': 1.40,
+                    '9': 2.50,
+                    '10': 2.30,
+                    '11': 2.20,
+                    '12': 2.10,
+                    '13': 2.00,
+                    '14': 2.00,
+                    '15': 1.70
                 }
                 
                 country_names = {
                     '6': 'روسيا',
                     '2': 'كازاخستان', 
                     '1': 'أوكرانيا',
-                    '0': 'جميع الدول'
+                    '0': 'جميع الدول',
+                    '187': 'مصر',
+                    '194': 'السعودية',
+                    '195': 'الإمارات',
+                    '193': 'الكويت',
+                    '196': 'قطر',
+                    '197': 'البحرين',
+                    '198': 'عمان',
+                    '3': 'إندونيسيا',
+                    '4': 'الهند',
+                    '5': 'الفلبين',
+                    '7': 'فيتنام',
+                    '8': 'الصين',
+                    '9': 'الولايات المتحدة',
+                    '10': 'بريطانيا',
+                    '11': 'ألمانيا',
+                    '12': 'فرنسا',
+                    '13': 'إسبانيا',
+                    '14': 'إيطاليا',
+                    '15': 'تركيا'
                 }
                 
                 country_flags = {
                     '6': '🇷🇺',
                     '2': '🇰🇿',
                     '1': '🇺🇦',
-                    '0': '🌍'
+                    '0': '🌍',
+                    '187': '🇪🇬',
+                    '194': '🇸🇦',
+                    '195': '🇦🇪',
+                    '193': '🇰🇼',
+                    '196': '🇶🇦',
+                    '197': '🇧🇭',
+                    '198': '🇴🇲',
+                    '3': '🇮🇩',
+                    '4': '🇮🇳',
+                    '5': '🇵🇭',
+                    '7': '🇻🇳',
+                    '8': '🇨🇳',
+                    '9': '🇺🇸',
+                    '10': '🇬🇧',
+                    '11': '🇩🇪',
+                    '12': '🇫🇷',
+                    '13': '🇪🇸',
+                    '14': '🇮🇹',
+                    '15': '🇹🇷'
                 }
                 
                 country_name = country_names.get(country, 'غير معروفة')
