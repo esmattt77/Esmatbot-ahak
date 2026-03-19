@@ -24,7 +24,7 @@ AVAILABLE_SERVICES = {
     'av': '🏠 Avito',
 }
 
-# قائمة شاملة بجميع الدول المتاحة (مع رموزها ورموز الأعلام)
+# قائمة شاملة بجميع الدول المتاحة (مع رموزها ورموز الأعلام وأسماءها)
 COUNTRIES = [
     {'code': '6', 'name': 'روسيا', 'flag': '🇷🇺', 'price': 0.50},
     {'code': '2', 'name': 'كازاخستان', 'flag': '🇰🇿', 'price': 0.80},
@@ -270,7 +270,7 @@ def setup_bot(bot):
         else:
             bot.reply_to(message, "🔧 أوامر المشرفين:\n/admin balance - عرض رصيد API\n/admin stats - عرض إحصائيات")
     
-    def show_countries_page(call, service, service_name, page=0):
+    def show_countries_page(call, service, service_name, page=0, prices_data=None):
         """عرض صفحة من الدول مع أزرار التنقل"""
         user_id = call.from_user.id
         
@@ -282,11 +282,20 @@ def setup_bot(bot):
         # الحصول على الدول للصفحة الحالية
         current_countries = COUNTRIES[start_idx:end_idx]
         
+        # إنشاء نسخة من الدول مع تحديث الأسعار من API إذا كانت متوفرة
+        displayed_countries = []
+        for country in current_countries:
+            country_copy = country.copy()
+            # تحديث السعر من بيانات API إذا كانت متوفرة
+            if prices_data and country['code'] in prices_data and service in prices_data[country['code']]:
+                country_copy['price'] = prices_data[country['code']][service].get('cost', country['price'])
+            displayed_countries.append(country_copy)
+        
         # إنشاء لوحة المفاتيح
         keyboard = types.InlineKeyboardMarkup(row_width=2)
         
         # إضافة أزرار الدول
-        for country in current_countries:
+        for country in displayed_countries:
             button_text = f"{country['flag']} {country['name']} - ${country['price']:.2f}"
             keyboard.add(types.InlineKeyboardButton(
                 button_text, 
@@ -328,7 +337,7 @@ def setup_bot(bot):
         # تحديث الرسالة
         bot.edit_message_text(
             f"📱 **الخدمة:** {service_name}\n\n"
-            f"🌍 **اختر الدولة (مع السعر):**\n"
+            f"🌍 **اختر الدولة (الأسعار من الموقع):**\n"
             f"عرض {start_idx+1}-{end_idx} من {len(COUNTRIES)} دولة",
             call.message.chat.id,
             call.message.message_id,
@@ -405,35 +414,32 @@ def setup_bot(bot):
                 service = data.replace("service_", "")
                 service_name = AVAILABLE_SERVICES.get(service, service)
                 
+                # حفظ الخدمة في البيانات المؤقتة
+                if user_id not in user_data:
+                    user_data[user_id] = {}
+                user_data[user_id]['service'] = service
+                user_data[user_id]['service_name'] = service_name
+                
                 # رسالة تحميل
                 bot.edit_message_text(
-                    "🔄 **جاري تحميل الأسعار...**",
+                    "🔄 **جاري تحميل الأسعار من الموقع...**",
                     call.message.chat.id,
                     call.message.message_id,
                     parse_mode='Markdown'
                 )
                 
-                # محاولة جلب الأسعار من API
-                prices = {}
+                # جلب الأسعار الحقيقية من API
+                prices_data = None
                 if api_client:
                     try:
                         prices_data = api_client.get_prices(service)
                         if prices_data and isinstance(prices_data, dict):
-                            prices = prices_data
-                            logger.info(f"✅ تم جلب الأسعار للخدمة {service}: {len(prices)} دولة")
+                            logger.info(f"✅ تم جلب الأسعار للخدمة {service}: {len(prices_data)} دولة")
                     except Exception as e:
                         logger.error(f"❌ خطأ في جلب الأسعار: {e}")
-                        prices = {}
                 
-                # تحديث الأسعار في قائمة COUNTRIES
-                if prices:
-                    for country in COUNTRIES:
-                        code = country['code']
-                        if code in prices and isinstance(prices[code], dict) and service in prices[code]:
-                            country['price'] = prices[code][service].get('cost', country['price'])
-                
-                # عرض الصفحة الأولى من الدول
-                show_countries_page(call, service, service_name, 0)
+                # عرض الصفحة الأولى من الدول مع الأسعار المحدثة
+                show_countries_page(call, service, service_name, 0, prices_data)
             
             elif data.startswith("page_"):
                 # معالجة التنقل بين الصفحات
@@ -441,8 +447,17 @@ def setup_bot(bot):
                 if len(parts) >= 3:
                     service = parts[1]
                     page = int(parts[2])
-                    service_name = AVAILABLE_SERVICES.get(service, service)
-                    show_countries_page(call, service, service_name, page)
+                    service_name = user_data.get(user_id, {}).get('service_name', AVAILABLE_SERVICES.get(service, service))
+                    
+                    # جلب الأسعار مرة أخرى للتأكد من تحديثها
+                    prices_data = None
+                    if api_client:
+                        try:
+                            prices_data = api_client.get_prices(service)
+                        except:
+                            pass
+                    
+                    show_countries_page(call, service, service_name, page, prices_data)
             
             elif data == "noop":
                 # زر غير فعال (للعداد فقط)
@@ -460,11 +475,21 @@ def setup_bot(bot):
                 selected_country = None
                 for c in COUNTRIES:
                     if c['code'] == country:
-                        selected_country = c
+                        selected_country = c.copy()  # نسخ لتجنب التعديل على الأصل
                         break
                 
                 if not selected_country:
                     selected_country = {'code': country, 'name': 'غير معروفة', 'flag': '🏳️', 'price': 1.0}
+                
+                # محاولة الحصول على السعر الحقيقي من API
+                if api_client and service:
+                    try:
+                        prices_data = api_client.get_prices(service)
+                        if prices_data and country in prices_data and service in prices_data[country]:
+                            selected_country['price'] = prices_data[country][service].get('cost', selected_country['price'])
+                            logger.info(f"💰 السعر الحقيقي للدولة {country}: ${selected_country['price']}")
+                    except Exception as e:
+                        logger.error(f"خطأ في جلب السعر للدولة {country}: {e}")
                 
                 country_name = selected_country['name']
                 country_flag = selected_country['flag']
