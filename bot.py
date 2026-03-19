@@ -544,6 +544,13 @@ def setup_bot(bot):
                 service = user_info.get('service', 'tg')
                 service_name = user_info.get('service_name', 'تلغرام')
                 
+                # التحقق من وجود رقم صفحة
+                page = 1
+                if '_page_' in country:
+                    parts = country.split('_page_')
+                    country = parts[0]
+                    page = int(parts[1])
+                
                 # جلب بيانات السيرفرات من API
                 bot.edit_message_text(
                     "🔄 **جاري تحميل خيارات السيرفرات...**",
@@ -565,61 +572,141 @@ def setup_bot(bot):
                     except Exception as e:
                         logger.error(f"❌ خطأ في جلب السيرفرات: {e}")
                 
-                # عرض قائمة السيرفرات
-                keyboard = types.InlineKeyboardMarkup(row_width=1)
-                
+                # تجهيز قائمة السيرفرات
+                operators_list = []
                 if operators_data and isinstance(operators_data, dict):
-                    # عرض السيرفرات المتاحة من API
+                    # تحويل القاموس إلى قائمة للترتيب
                     for operator, data in operators_data.items():
                         if isinstance(data, dict) and 'cost' in data:
-                            price = data['cost']
-                            count = data.get('count', 0)
-                            operator_name = OPERATOR_NAMES.get(operator, f'📡 سيرفر {operator}')
-                            
-                            # إضافة عدد الأرقام المتاحة إذا كان موجوداً
-                            if count > 0:
-                                button_text = f"{operator_name} - ${price:.2f} (متاح: {count})"
-                            else:
-                                button_text = f"{operator_name} - ${price:.2f}"
-                            
-                            keyboard.add(types.InlineKeyboardButton(
-                                button_text,
-                                callback_data=f"operator_{country}_{operator}"
-                            ))
-                else:
-                    # إذا لم توجد بيانات، استخدم السيرفرات الافتراضية
-                    default_operators = [
-                        ('any', '🔄 أي مشغل', 0.5),
-                        ('mts', '📡 MTS', 0.6),
-                        ('beeline', '📡 Beeline', 0.55),
-                        ('megafon', '📡 Megafon', 0.58),
-                        ('tele2', '📡 Tele2', 0.52),
-                    ]
+                            operators_list.append((operator, data))
                     
-                    for op_code, op_name, op_price in default_operators:
-                        button_text = f"{op_name} - ${op_price:.2f}"
+                    # ترتيب السيرفرات حسب السعر (الأقل أولاً)
+                    operators_list.sort(key=lambda x: x[1].get('cost', 0))
+                    
+                    logger.info(f"📊 تم تحويل {len(operators_list)} سيرفر إلى قائمة مرتبة")
+                else:
+                    # سيرفرات افتراضية (احتياطي)
+                    logger.warning("⚠️ استخدام السيرفرات الافتراضية")
+                    default_operators = [
+                        ('any', {'cost': 0.5, 'count': 100}),
+                        ('mts', {'cost': 0.6, 'count': 50}),
+                        ('beeline', {'cost': 0.55, 'count': 75}),
+                        ('megafon', {'cost': 0.58, 'count': 60}),
+                        ('tele2', {'cost': 0.52, 'count': 80}),
+                        ('vodafone', {'cost': 0.65, 'count': 40}),
+                        ('kyivstar', {'cost': 0.62, 'count': 45}),
+                        ('lifecell', {'cost': 0.59, 'count': 55}),
+                        ('orange', {'cost': 0.70, 'count': 30}),
+                        ('t-mobile', {'cost': 0.75, 'count': 25}),
+                        ('verizon', {'cost': 0.80, 'count': 20}),
+                        ('att', {'cost': 0.78, 'count': 22}),
+                    ]
+                    operators_list = default_operators
+                
+                # إعداد الترقيم
+                items_per_page = 8  # عدد السيرفرات في كل صفحة
+                total_pages = (len(operators_list) + items_per_page - 1) // items_per_page
+                
+                # التأكد أن رقم الصفحة ضمن النطاق الصحيح
+                if page < 1:
+                    page = 1
+                elif page > total_pages:
+                    page = total_pages
+                
+                start_idx = (page - 1) * items_per_page
+                end_idx = min(start_idx + items_per_page, len(operators_list))
+                
+                # عرض السيرفرات للصفحة الحالية
+                keyboard = types.InlineKeyboardMarkup(row_width=1)
+                
+                # رسالة إذا لم توجد سيرفرات
+                if len(operators_list) == 0:
+                    keyboard.add(types.InlineKeyboardButton(
+                        "❌ لا توجد سيرفرات متاحة", 
+                        callback_data="noop"
+                    ))
+                else:
+                    # إضافة أزرار السيرفرات للصفحة الحالية
+                    for i in range(start_idx, end_idx):
+                        operator, data = operators_list[i]
+                        price = data.get('cost', 0.5)
+                        count = data.get('count', 0)
+                        
+                        # الحصول على اسم السيرفر
+                        if operator in OPERATOR_NAMES:
+                            operator_name = OPERATOR_NAMES[operator]
+                        else:
+                            # إذا كان اسم السيرفر غير معروف، استخدم صيغة مناسبة
+                            operator_name = f"📡 {operator}"
+                        
+                        # إضافة عدد الأرقام المتاحة
+                        if count > 0:
+                            button_text = f"{operator_name} - ${price:.2f} (📊 {count})"
+                        else:
+                            button_text = f"{operator_name} - ${price:.2f}"
+                        
                         keyboard.add(types.InlineKeyboardButton(
                             button_text,
-                            callback_data=f"operator_{country}_{op_code}"
+                            callback_data=f"operator_{country}_{operator}"
                         ))
                 
-                keyboard.add(types.InlineKeyboardButton("🔙 رجوع للدول", callback_data=f"service_{service}"))
+                # إضافة أزرار التنقل بين الصفحات
+                nav_buttons = []
+                
+                if page > 1:
+                    nav_buttons.append(types.InlineKeyboardButton(
+                        "◀️ السابق", 
+                        callback_data=f"country_{country}_page_{page-1}"
+                    ))
+                
+                # عرض معلومات الصفحة (كزر غير قابل للنقر)
+                if total_pages > 1:
+                    nav_buttons.append(types.InlineKeyboardButton(
+                        f"📄 {page}/{total_pages}", 
+                        callback_data="noop"
+                    ))
+                
+                if page < total_pages:
+                    nav_buttons.append(types.InlineKeyboardButton(
+                        "التالي ▶️", 
+                        callback_data=f"country_{country}_page_{page+1}"
+                    ))
+                
+                if nav_buttons:
+                    keyboard.row(*nav_buttons)
+                
+                # إضافة زر الرجوع للدول
+                keyboard.add(types.InlineKeyboardButton(
+                    "🔙 رجوع للدول", 
+                    callback_data=f"service_{service}"
+                ))
                 
                 # ترجمة اسم الدولة
                 country_name = country_names.get(country, f'دولة {country}')
                 country_flag = country_flags.get(country, '🏳️')
                 
-                # حفظ معلومات الدولة
+                # حفظ معلومات الدولة في بيانات المستخدم
                 if user_id not in user_data:
                     user_data[user_id] = {}
                 user_data[user_id]['country'] = country
                 user_data[user_id]['country_name'] = country_name
                 user_data[user_id]['country_flag'] = country_flag
                 
+                # بناء رسالة الحالة
+                message_lines = [
+                    f"📱 **الخدمة:** {service_name}",
+                    f"🌍 **الدولة:** {country_flag} {country_name}",
+                    f"📊 **إجمالي السيرفرات:** {len(operators_list)}"
+                ]
+                
+                if total_pages > 1:
+                    message_lines.append(f"📄 **الصفحة:** {page} من {total_pages}")
+                
+                message_lines.append("")  # سطر فارغ
+                message_lines.append("🔽 **اختر السيرفر المناسب:**")
+                
                 bot.edit_message_text(
-                    f"📱 **الخدمة:** {service_name}\n"
-                    f"🌍 **الدولة:** {country_flag} {country_name}\n\n"
-                    f"🔽 **اختر السيرفر المناسب:**",
+                    "\n".join(message_lines),
                     call.message.chat.id,
                     call.message.message_id,
                     reply_markup=keyboard,
@@ -666,7 +753,14 @@ def setup_bot(bot):
                         types.InlineKeyboardButton("✅ تأكيد الشراء", callback_data="confirm_purchase"),
                         types.InlineKeyboardButton("❌ إلغاء", callback_data="cancel")
                     )
-                    keyboard.add(types.InlineKeyboardButton("🔙 اختيار سيرفر آخر", callback_data=f"country_{country}"))
+                    
+                    # إضافة زر العودة للسيرفرات مع الحفاظ على الصفحة الحالية
+                    # نحتاج لاستخراج رقم الصفحة الحالية من بيانات المستخدم أو استخدام قيمة افتراضية
+                    current_page = user_info.get('current_operators_page', 1)
+                    keyboard.add(types.InlineKeyboardButton(
+                        "🔙 اختيار سيرفر آخر", 
+                        callback_data=f"country_{country}_page_{current_page}"
+                    ))
                     
                     bot.edit_message_text(
                         f"📱 **تأكيد الطلب**\n\n"
