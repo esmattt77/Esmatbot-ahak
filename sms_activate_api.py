@@ -154,10 +154,9 @@ class HeroSMSAPI:
             logger.error(f"❌ استثناء في جلب الأسعار: {e}")
             return {}
     
-    def get_services_with_operators(self, service: str = None, country: int = None) -> Dict:
+    def debug_prices_structure(self, service: str = None, country: int = None) -> Dict:
         """
-        الحصول على الخدمات مع المشغلين (السيرفرات) والأسعار المختلفة
-        ترجع بيانات مثل: {country_code: {operator_code: {price: 0.5, count: 100}}}
+        دالة تصحيح لمعرفة هيكل البيانات الفعلي من API
         """
         params = {'action': 'getPrices'}
         if service:
@@ -172,13 +171,116 @@ class HeroSMSAPI:
             
             try:
                 data = json.loads(result)
-                logger.info(f"✅ تم جلب بيانات السيرفرات: {len(data)} دولة")
+                logger.info(f"🔍 DEBUG - هيكل البيانات المستلم:")
+                
+                # تحليل الهيكل
+                if isinstance(data, dict):
+                    for country_code, country_data in list(data.items())[:3]:  # أول 3 دول فقط
+                        logger.info(f"   الدولة {country_code}: {type(country_data)}")
+                        if isinstance(country_data, dict):
+                            for service_code, service_data in country_data.items():
+                                logger.info(f"      الخدمة {service_code}: {type(service_data)}")
+                                if isinstance(service_data, dict):
+                                    for operator, operator_data in service_data.items():
+                                        logger.info(f"         المشغل {operator}: {operator_data}")
                 return data
             except json.JSONDecodeError:
                 logger.error(f"❌ فشل تحليل JSON")
                 return {}
         except Exception as e:
+            logger.error(f"❌ استثناء: {e}")
+            return {}
+    
+    def get_services_with_operators(self, service: str = None, country: int = None) -> Dict:
+        """
+        الحصول على الخدمات مع المشغلين (السيرفرات) والأسعار المختلفة
+        ترجع بيانات بالتنسيق الصحيح: {country_code: {service_code: {operator: {'cost': price, 'count': count}}}}
+        """
+        params = {'action': 'getPrices'}
+        if service:
+            params['service'] = service
+        if country:
+            params['country'] = country
+        
+        try:
+            result = self._make_request(params)
+            if result.startswith('ERROR'):
+                return {}
+            
+            try:
+                data = json.loads(result)
+                
+                # تحقق من أن البيانات هي قاموس
+                if not isinstance(data, dict):
+                    logger.error(f"❌ البيانات ليست قاموساً: {type(data)}")
+                    return {}
+                
+                # إعادة هيكلة البيانات إذا لزم الأمر
+                formatted_data = {}
+                
+                for country_code, country_data in data.items():
+                    if not isinstance(country_data, dict):
+                        continue
+                    
+                    formatted_data[country_code] = {}
+                    
+                    for service_code, service_data in country_data.items():
+                        if not isinstance(service_data, dict):
+                            continue
+                        
+                        # إذا كنا نبحث عن خدمة محددة وليست مطابقة، نتخطى
+                        if service and service_code != service:
+                            continue
+                        
+                        formatted_data[country_code][service_code] = {}
+                        
+                        # البيانات قد تكون مباشرة (إذا كانت الخدمة محددة)
+                        if 'cost' in service_data and 'count' in service_data:
+                            # هذا يعني أن service_data هو بيانات المشغل (وليس قاموس مشغلين)
+                            operator = 'any'  # افتراضي
+                            formatted_data[country_code][service_code][operator] = {
+                                'cost': service_data.get('cost', 0),
+                                'count': service_data.get('count', 0)
+                            }
+                        else:
+                            # service_data هو قاموس المشغلين
+                            for operator, operator_data in service_data.items():
+                                if isinstance(operator_data, dict):
+                                    formatted_data[country_code][service_code][operator] = {
+                                        'cost': operator_data.get('cost', 0),
+                                        'count': operator_data.get('count', 0)
+                                    }
+                                elif isinstance(operator_data, (int, float)):
+                                    # بعض APIs ترجع السعر مباشرة بدون count
+                                    formatted_data[country_code][service_code][operator] = {
+                                        'cost': float(operator_data),
+                                        'count': 0
+                                    }
+                
+                logger.info(f"✅ تم جلب بيانات السيرفرات: {len(formatted_data)} دولة")
+                
+                # إذا طلبنا دولة محددة، سجل عدد السيرفرات
+                if country and str(country) in formatted_data:
+                    country_str = str(country)
+                    if service in formatted_data[country_str]:
+                        servers_count = len(formatted_data[country_str][service])
+                        logger.info(f"   الدولة {country} لديها {servers_count} سيرفر للخدمة {service}")
+                    else:
+                        logger.warning(f"⚠️ الخدمة {service} غير موجودة للدولة {country} في البيانات المهيكلة")
+                        
+                        # محاولة البحث في البيانات الأصلية
+                        if country_str in data and service in data[country_str]:
+                            logger.info(f"✅ تم العثور على الخدمة في البيانات الأصلية")
+                
+                return formatted_data
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ فشل تحليل JSON: {e}")
+                return {}
+        except Exception as e:
             logger.error(f"❌ استثناء في جلب السيرفرات: {e}")
+            import traceback
+            traceback.print_exc()
             return {}
     
     def set_status(self, activation_id: int, status: int) -> bool:
