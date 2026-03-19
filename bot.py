@@ -4,6 +4,8 @@ import logging
 import os
 import random
 import time
+import json
+from flask import jsonify
 from sms_activate_api import HeroSMSAPI
 
 logger = logging.getLogger(__name__)
@@ -12,6 +14,7 @@ logger = logging.getLogger(__name__)
 api_client = None
 admin_ids = []
 bot_instance = None
+app = None  # مرجع لتطبيق Flask
 
 # الخدمات المتاحة
 AVAILABLE_SERVICES = {
@@ -24,7 +27,7 @@ AVAILABLE_SERVICES = {
     'av': '🏠 Avito',
 }
 
-# قاموس أسماء المشغلين (السيرفرات)
+# أسماء المشغلين (السيرفرات) - موسعة
 OPERATOR_NAMES = {
     'any': '🔄 أي مشغل',
     'mts': '📡 MTS',
@@ -46,7 +49,29 @@ OPERATOR_NAMES = {
     'stc': '📡 STC',
     'mobily': '📡 Mobily',
     'virgin': '📡 Virgin',
+    'pms': '📡 PMS',
+    'life': '📡 Life',
+    'motiv': '📡 Motiv',
+    'rostelecom': '📡 Rostelecom',
+    'tinkoff': '📡 Tinkoff',
+    'yota': '📡 Yota',
+    'sber': '📡 Sber',
+    'megafon': '📡 Megafon',
 }
+
+# دالة للحصول على اسم السيرفر بشكل مناسب
+def get_operator_name(operator_code):
+    """الحصول على اسم مناسب للسيرفر"""
+    if operator_code in OPERATOR_NAMES:
+        return OPERATOR_NAMES[operator_code]
+    
+    # محاولة تنسيق الاسم إذا كان رمزاً
+    if operator_code.startswith('opt') or operator_code.startswith('server'):
+        return f"📡 {operator_code.upper()}"
+    elif operator_code.isdigit():
+        return f"📡 سيرفر {operator_code}"
+    else:
+        return f"📡 {operator_code.capitalize()}"
 
 # قاموس رموز المشغلين (اختصاري)
 OPERATOR_CODES = {
@@ -206,12 +231,13 @@ user_data = {}
 country_names = {str(c['code']): c['name'] for c in COUNTRIES}
 country_flags = {str(c['code']): c['flag'] for c in COUNTRIES}
 
-def setup_bot(bot):
+def setup_bot(bot, flask_app=None):
     """إعداد جميع معالجات البوت"""
-    global api_client, admin_ids, bot_instance
+    global api_client, admin_ids, bot_instance, app
     
-    # حفظ مرجع البوت
+    # حفظ مرجع البوت وتطبيق Flask
     bot_instance = bot
+    app = flask_app
     
     # تهيئة API client
     api_key = os.environ.get('SMS_ACTIVATE_API_KEY')
@@ -220,6 +246,33 @@ def setup_bot(bot):
         logger.info("✅ تم تهيئة API client")
     else:
         logger.warning("⚠️ SMS_ACTIVATE_API_KEY غير موجودة - سيتم استخدام وضع التجربة")
+    
+    # إضافة نقطة اختبار للتصحيح إذا كان تطبيق Flask متاحاً
+    if app:
+        @app.route('/debug_prices/<service>/<country>', methods=['GET'])
+        def debug_prices(service, country):
+            """نقطة اختبار لرؤية هيكل البيانات"""
+            from sms_activate_api import HeroSMSAPI
+            api_key = os.environ.get('SMS_ACTIVATE_API_KEY')
+            temp_api = HeroSMSAPI(api_key)
+            
+            try:
+                # جلب البيانات
+                data = temp_api.debug_prices_structure(service, int(country))
+                
+                # تنسيق للعرض
+                result = {
+                    'service': service,
+                    'country': country,
+                    'data': data
+                }
+                return jsonify(result)
+            except Exception as e:
+                return {'error': str(e)}
+            finally:
+                temp_api.session.close()
+        
+        logger.info("✅ تم إضافة نقطة اختبار /debug_prices/<service>/<country>")
     
     # قراءة معرفات المشرفين
     admin_ids_str = os.environ.get('ADMIN_IDS', '')
@@ -564,13 +617,33 @@ def setup_bot(bot):
                     try:
                         # جلب بيانات السيرفرات للدولة والخدمة المحددة
                         prices_data = api_client.get_services_with_operators(service, int(country))
-                        if prices_data and country in prices_data:
-                            country_data = prices_data[country]
+                        
+                        # تحقق من وجود البيانات للدولة والخدمة المطلوبة
+                        country_str = str(country)
+                        if prices_data and country_str in prices_data:
+                            country_data = prices_data[country_str]
                             if service in country_data:
                                 operators_data = country_data[service]
                                 logger.info(f"✅ تم جلب {len(operators_data)} سيرفر للدولة {country}")
+                            else:
+                                logger.warning(f"⚠️ الخدمة {service} غير موجودة للدولة {country}")
+                        else:
+                            logger.warning(f"⚠️ الدولة {country} غير موجودة في البيانات")
+                            
+                            # جرب البحث بدون تحديد الخدمة
+                            all_prices = api_client.get_prices(service)
+                            if all_prices and country_str in all_prices:
+                                logger.info(f"✅ تم العثور على الدولة باستخدام get_prices")
+                                country_data = all_prices[country_str]
+                                if isinstance(country_data, dict) and service in country_data:
+                                    operators_data = {service: country_data[service]}
+                                elif isinstance(country_data, dict):
+                                    # قد تكون البيانات مباشرة
+                                    operators_data = {'any': country_data}
                     except Exception as e:
                         logger.error(f"❌ خطأ في جلب السيرفرات: {e}")
+                        import traceback
+                        traceback.print_exc()
                 
                 # تجهيز قائمة السيرفرات
                 operators_list = []
@@ -632,12 +705,8 @@ def setup_bot(bot):
                         price = data.get('cost', 0.5)
                         count = data.get('count', 0)
                         
-                        # الحصول على اسم السيرفر
-                        if operator in OPERATOR_NAMES:
-                            operator_name = OPERATOR_NAMES[operator]
-                        else:
-                            # إذا كان اسم السيرفر غير معروف، استخدم صيغة مناسبة
-                            operator_name = f"📡 {operator}"
+                        # الحصول على اسم السيرفر باستخدام الدالة المحسنة
+                        operator_name = get_operator_name(operator)
                         
                         # إضافة عدد الأرقام المتاحة
                         if count > 0:
@@ -691,6 +760,7 @@ def setup_bot(bot):
                 user_data[user_id]['country'] = country
                 user_data[user_id]['country_name'] = country_name
                 user_data[user_id]['country_flag'] = country_flag
+                user_data[user_id]['current_operators_page'] = page
                 
                 # بناء رسالة الحالة
                 message_lines = [
@@ -742,11 +812,11 @@ def setup_bot(bot):
                     if user_id not in user_data:
                         user_data[user_id] = {}
                     user_data[user_id]['operator'] = operator
-                    user_data[user_id]['operator_name'] = OPERATOR_NAMES.get(operator, f'سيرفر {operator}')
+                    user_data[user_id]['operator_name'] = get_operator_name(operator)
                     user_data[user_id]['price'] = price
                     
                     # عرض تأكيد الشراء مع السيرفر
-                    operator_name = OPERATOR_NAMES.get(operator, f'سيرفر {operator}')
+                    operator_name = get_operator_name(operator)
                     
                     keyboard = types.InlineKeyboardMarkup(row_width=2)
                     keyboard.add(
@@ -755,7 +825,6 @@ def setup_bot(bot):
                     )
                     
                     # إضافة زر العودة للسيرفرات مع الحفاظ على الصفحة الحالية
-                    # نحتاج لاستخراج رقم الصفحة الحالية من بيانات المستخدم أو استخدام قيمة افتراضية
                     current_page = user_info.get('current_operators_page', 1)
                     keyboard.add(types.InlineKeyboardButton(
                         "🔙 اختيار سيرفر آخر", 
@@ -850,6 +919,8 @@ def setup_bot(bot):
                             )
                     except Exception as e:
                         logger.error(f"خطأ في طلب الرقم: {e}")
+                        import traceback
+                        traceback.print_exc()
                         bot.edit_message_text(
                             f"❌ **فشل شراء الرقم**\n\n"
                             f"السبب: خطأ تقني\n\n"
@@ -958,6 +1029,8 @@ def setup_bot(bot):
             
         except Exception as e:
             logger.error(f"خطأ في معالج الأزرار: {e}")
+            import traceback
+            traceback.print_exc()
             try:
                 bot.answer_callback_query(call.id, "❌ حدث خطأ")
             except:
