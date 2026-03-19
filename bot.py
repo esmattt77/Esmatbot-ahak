@@ -24,12 +24,61 @@ AVAILABLE_SERVICES = {
     'av': '🏠 Avito',
 }
 
-# قائمة شاملة بجميع الدول المتاحة (مع رموزها ورموز الأعلام وأسماءها)
+# قاموس أسماء المشغلين (السيرفرات)
+OPERATOR_NAMES = {
+    'any': '🔄 أي مشغل',
+    'mts': '📡 MTS',
+    'beeline': '📡 Beeline',
+    'megafon': '📡 Megafon',
+    'tele2': '📡 Tele2',
+    'vodafone': '📡 Vodafone',
+    'kyivstar': '📡 Kyivstar',
+    'lifecell': '📡 Lifecell',
+    'orange': '📡 Orange',
+    't-mobile': '📡 T-Mobile',
+    'verizon': '📡 Verizon',
+    'att': '📡 AT&T',
+    'o2': '📡 O2',
+    'three': '📡 Three',
+    'etisalat': '📡 Etisalat',
+    'du': '📡 Du',
+    'zain': '📡 Zain',
+    'stc': '📡 STC',
+    'mobily': '📡 Mobily',
+    'virgin': '📡 Virgin',
+}
+
+# قاموس رموز المشغلين (اختصاري)
+OPERATOR_CODES = {
+    'any': 'any',
+    'mts': 'mts',
+    'beeline': 'beeline',
+    'megafon': 'megafon',
+    'tele2': 'tele2',
+    'vodafone': 'vodafone',
+    'kyivstar': 'kyivstar',
+    'lifecell': 'lifecell',
+    'orange': 'orange',
+    't-mobile': 't-mobile',
+    'verizon': 'verizon',
+    'att': 'att',
+    'o2': 'o2',
+    'three': 'three',
+    'etisalat': 'etisalat',
+    'du': 'du',
+    'zain': 'zain',
+    'stc': 'stc',
+    'mobily': 'mobily',
+    'virgin': 'virgin',
+}
+
+# قائمة شاملة بجميع الدول المتاحة (مع رموزها ورموز الأعلام)
 COUNTRIES = [
-    {'code': '6', 'name': 'روسيا', 'flag': '🇷🇺', 'price': 0.50},
-    {'code': '2', 'name': 'كازاخستان', 'flag': '🇰🇿', 'price': 0.80},
-    {'code': '1', 'name': 'أوكرانيا', 'flag': '🇺🇦', 'price': 0.60},
-    {'code': '0', 'name': 'جميع الدول', 'flag': '🌍', 'price': 1.50},
+    {'code': '1', 'name': 'روسيا', 'flag': '🇷🇺', 'price': 0.50},
+    {'code': '2', 'name': 'أوكرانيا', 'flag': '🇺🇦', 'price': 0.60},
+    {'code': '3', 'name': 'كازاخستان', 'flag': '🇰🇿', 'price': 0.80},
+    {'code': '4', 'name': 'بيلاروسيا', 'flag': '🇧🇾', 'price': 0.70},
+    {'code': '6', 'name': 'إندونيسيا', 'flag': '🇮🇩', 'price': 1.10},
     {'code': '187', 'name': 'مصر', 'flag': '🇪🇬', 'price': 1.20},
     {'code': '194', 'name': 'السعودية', 'flag': '🇸🇦', 'price': 1.80},
     {'code': '195', 'name': 'الإمارات', 'flag': '🇦🇪', 'price': 2.00},
@@ -51,97 +100,111 @@ COUNTRIES = [
     {'code': '205', 'name': 'الصومال', 'flag': '🇸🇴', 'price': 1.40},
     {'code': '206', 'name': 'جيبوتي', 'flag': '🇩🇯', 'price': 1.30},
     {'code': '207', 'name': 'موريتانيا', 'flag': '🇲🇷', 'price': 1.30},
-    {'code': '3', 'name': 'إندونيسيا', 'flag': '🇮🇩', 'price': 1.10},
-    {'code': '4', 'name': 'الهند', 'flag': '🇮🇳', 'price': 0.90},
-    {'code': '5', 'name': 'الفلبين', 'flag': '🇵🇭', 'price': 1.30},
-    {'code': '7', 'name': 'فيتنام', 'flag': '🇻🇳', 'price': 1.00},
-    {'code': '8', 'name': 'الصين', 'flag': '🇨🇳', 'price': 1.40},
-    {'code': '9', 'name': 'الولايات المتحدة', 'flag': '🇺🇸', 'price': 2.50},
-    {'code': '10', 'name': 'بريطانيا', 'flag': '🇬🇧', 'price': 2.30},
-    {'code': '11', 'name': 'ألمانيا', 'flag': '🇩🇪', 'price': 2.20},
-    {'code': '12', 'name': 'فرنسا', 'flag': '🇫🇷', 'price': 2.10},
-    {'code': '13', 'name': 'إسبانيا', 'flag': '🇪🇸', 'price': 2.00},
-    {'code': '14', 'name': 'إيطاليا', 'flag': '🇮🇹', 'price': 2.00},
-    {'code': '15', 'name': 'تركيا', 'flag': '🇹🇷', 'price': 1.70},
-    {'code': '16', 'name': 'اليونان', 'flag': '🇬🇷', 'price': 1.90},
-    {'code': '17', 'name': 'هولندا', 'flag': '🇳🇱', 'price': 2.10},
-    {'code': '18', 'name': 'بلجيكا', 'flag': '🇧🇪', 'price': 2.00},
-    {'code': '19', 'name': 'السويد', 'flag': '🇸🇪', 'price': 2.20},
-    {'code': '20', 'name': 'النرويج', 'flag': '🇳🇴', 'price': 2.30},
-    {'code': '21', 'name': 'الدنمارك', 'flag': '🇩🇰', 'price': 2.20},
-    {'code': '22', 'name': 'فنلندا', 'flag': '🇫🇮', 'price': 2.10},
-    {'code': '23', 'name': 'بولندا', 'flag': '🇵🇱', 'price': 1.80},
-    {'code': '24', 'name': 'التشيك', 'flag': '🇨🇿', 'price': 1.90},
-    {'code': '25', 'name': 'سلوفاكيا', 'flag': '🇸🇰', 'price': 1.80},
-    {'code': '26', 'name': 'المجر', 'flag': '🇭🇺', 'price': 1.80},
-    {'code': '27', 'name': 'رومانيا', 'flag': '🇷🇴', 'price': 1.70},
-    {'code': '28', 'name': 'بلغاريا', 'flag': '🇧🇬', 'price': 1.60},
-    {'code': '29', 'name': 'صربيا', 'flag': '🇷🇸', 'price': 1.60},
-    {'code': '30', 'name': 'كرواتيا', 'flag': '🇭🇷', 'price': 1.70},
-    {'code': '31', 'name': 'البوسنة', 'flag': '🇧🇦', 'price': 1.50},
-    {'code': '32', 'name': 'ألبانيا', 'flag': '🇦🇱', 'price': 1.50},
-    {'code': '33', 'name': 'مقدونيا', 'flag': '🇲🇰', 'price': 1.50},
-    {'code': '34', 'name': 'الجبل الأسود', 'flag': '🇲🇪', 'price': 1.50},
-    {'code': '35', 'name': 'البرتغال', 'flag': '🇵🇹', 'price': 1.90},
-    {'code': '36', 'name': 'سويسرا', 'flag': '🇨🇭', 'price': 2.40},
-    {'code': '37', 'name': 'النمسا', 'flag': '🇦🇹', 'price': 2.20},
-    {'code': '38', 'name': 'البرازيل', 'flag': '🇧🇷', 'price': 2.00},
-    {'code': '39', 'name': 'الأرجنتين', 'flag': '🇦🇷', 'price': 1.80},
-    {'code': '40', 'name': 'المكسيك', 'flag': '🇲🇽', 'price': 1.90},
-    {'code': '41', 'name': 'كولومبيا', 'flag': '🇨🇴', 'price': 1.70},
-    {'code': '42', 'name': 'تشيلي', 'flag': '🇨🇱', 'price': 1.80},
-    {'code': '43', 'name': 'بيرو', 'flag': '🇵🇪', 'price': 1.60},
-    {'code': '44', 'name': 'فنزويلا', 'flag': '🇻🇪', 'price': 1.50},
-    {'code': '45', 'name': 'الإكوادور', 'flag': '🇪🇨', 'price': 1.50},
-    {'code': '46', 'name': 'بوليفيا', 'flag': '🇧🇴', 'price': 1.40},
-    {'code': '47', 'name': 'باراغواي', 'flag': '🇵🇾', 'price': 1.40},
-    {'code': '48', 'name': 'أوروغواي', 'flag': '🇺🇾', 'price': 1.60},
-    {'code': '49', 'name': 'غيانا', 'flag': '🇬🇾', 'price': 1.30},
-    {'code': '50', 'name': 'سورينام', 'flag': '🇸🇷', 'price': 1.30},
-    {'code': '51', 'name': 'غويانا الفرنسية', 'flag': '🇬🇫', 'price': 1.40},
-    {'code': '52', 'name': 'جنوب أفريقيا', 'flag': '🇿🇦', 'price': 1.80},
-    {'code': '53', 'name': 'نيجيريا', 'flag': '🇳🇬', 'price': 1.40},
-    {'code': '54', 'name': 'كينيا', 'flag': '🇰🇪', 'price': 1.30},
-    {'code': '55', 'name': 'إثيوبيا', 'flag': '🇪🇹', 'price': 1.20},
-    {'code': '56', 'name': 'تنزانيا', 'flag': '🇹🇿', 'price': 1.20},
-    {'code': '57', 'name': 'أوغندا', 'flag': '🇺🇬', 'price': 1.20},
-    {'code': '58', 'name': 'رواندا', 'flag': '🇷🇼', 'price': 1.10},
-    {'code': '59', 'name': 'بوروندي', 'flag': '🇧🇮', 'price': 1.10},
-    {'code': '60', 'name': 'الكونغو', 'flag': '🇨🇩', 'price': 1.10},
-    {'code': '61', 'name': 'الكاميرون', 'flag': '🇨🇲', 'price': 1.20},
-    {'code': '62', 'name': 'الغابون', 'flag': '🇬🇦', 'price': 1.30},
-    {'code': '63', 'name': 'غينيا', 'flag': '🇬🇳', 'price': 1.10},
-    {'code': '64', 'name': 'غانا', 'flag': '🇬🇭', 'price': 1.20},
-    {'code': '65', 'name': 'كوت ديفوار', 'flag': '🇨🇮', 'price': 1.20},
-    {'code': '66', 'name': 'بوركينا فاسو', 'flag': '🇧🇫', 'price': 1.10},
-    {'code': '67', 'name': 'مالي', 'flag': '🇲🇱', 'price': 1.10},
-    {'code': '68', 'name': 'النيجر', 'flag': '🇳🇪', 'price': 1.10},
-    {'code': '69', 'name': 'السنغال', 'flag': '🇸🇳', 'price': 1.20},
-    {'code': '70', 'name': 'بنين', 'flag': '🇧🇯', 'price': 1.10},
-    {'code': '71', 'name': 'توغو', 'flag': '🇹🇬', 'price': 1.10},
-    {'code': '72', 'name': 'أستراليا', 'flag': '🇦🇺', 'price': 2.40},
-    {'code': '73', 'name': 'نيوزيلندا', 'flag': '🇳🇿', 'price': 2.30},
-    {'code': '74', 'name': 'اليابان', 'flag': '🇯🇵', 'price': 2.20},
-    {'code': '75', 'name': 'كوريا الجنوبية', 'flag': '🇰🇷', 'price': 2.10},
-    {'code': '76', 'name': 'سنغافورة', 'flag': '🇸🇬', 'price': 2.00},
-    {'code': '77', 'name': 'ماليزيا', 'flag': '🇲🇾', 'price': 1.70},
-    {'code': '78', 'name': 'تايلاند', 'flag': '🇹🇭', 'price': 1.60},
-    {'code': '79', 'name': 'ميانمار', 'flag': '🇲🇲', 'price': 1.30},
-    {'code': '80', 'name': 'كمبوديا', 'flag': '🇰🇭', 'price': 1.30},
-    {'code': '81', 'name': 'لاوس', 'flag': '🇱🇦', 'price': 1.20},
-    {'code': '82', 'name': 'باكستان', 'flag': '🇵🇰', 'price': 1.20},
-    {'code': '83', 'name': 'بنغلاديش', 'flag': '🇧🇩', 'price': 1.10},
-    {'code': '84', 'name': 'سريلانكا', 'flag': '🇱🇰', 'price': 1.20},
-    {'code': '85', 'name': 'نيبال', 'flag': '🇳🇵', 'price': 1.10},
-    {'code': '86', 'name': 'أفغانستان', 'flag': '🇦🇫', 'price': 1.00},
-    {'code': '87', 'name': 'إيران', 'flag': '🇮🇷', 'price': 1.30}
+    {'code': '7', 'name': 'الولايات المتحدة', 'flag': '🇺🇸', 'price': 2.50},
+    {'code': '8', 'name': 'كندا', 'flag': '🇨🇦', 'price': 2.40},
+    {'code': '9', 'name': 'بريطانيا', 'flag': '🇬🇧', 'price': 2.30},
+    {'code': '10', 'name': 'ألمانيا', 'flag': '🇩🇪', 'price': 2.20},
+    {'code': '11', 'name': 'فرنسا', 'flag': '🇫🇷', 'price': 2.10},
+    {'code': '12', 'name': 'إسبانيا', 'flag': '🇪🇸', 'price': 2.00},
+    {'code': '13', 'name': 'إيطاليا', 'flag': '🇮🇹', 'price': 2.00},
+    {'code': '14', 'name': 'هولندا', 'flag': '🇳🇱', 'price': 2.10},
+    {'code': '15', 'name': 'بلجيكا', 'flag': '🇧🇪', 'price': 2.00},
+    {'code': '16', 'name': 'السويد', 'flag': '🇸🇪', 'price': 2.20},
+    {'code': '17', 'name': 'النرويج', 'flag': '🇳🇴', 'price': 2.30},
+    {'code': '18', 'name': 'الدنمارك', 'flag': '🇩🇰', 'price': 2.20},
+    {'code': '19', 'name': 'فنلندا', 'flag': '🇫🇮', 'price': 2.10},
+    {'code': '20', 'name': 'بولندا', 'flag': '🇵🇱', 'price': 1.80},
+    {'code': '21', 'name': 'التشيك', 'flag': '🇨🇿', 'price': 1.90},
+    {'code': '22', 'name': 'سلوفاكيا', 'flag': '🇸🇰', 'price': 1.80},
+    {'code': '23', 'name': 'المجر', 'flag': '🇭🇺', 'price': 1.80},
+    {'code': '24', 'name': 'رومانيا', 'flag': '🇷🇴', 'price': 1.70},
+    {'code': '25', 'name': 'بلغاريا', 'flag': '🇧🇬', 'price': 1.60},
+    {'code': '26', 'name': 'اليونان', 'flag': '🇬🇷', 'price': 1.90},
+    {'code': '27', 'name': 'البرتغال', 'flag': '🇵🇹', 'price': 1.90},
+    {'code': '28', 'name': 'سويسرا', 'flag': '🇨🇭', 'price': 2.40},
+    {'code': '29', 'name': 'النمسا', 'flag': '🇦🇹', 'price': 2.20},
+    {'code': '30', 'name': 'اليابان', 'flag': '🇯🇵', 'price': 2.20},
+    {'code': '31', 'name': 'كوريا الجنوبية', 'flag': '🇰🇷', 'price': 2.10},
+    {'code': '32', 'name': 'الصين', 'flag': '🇨🇳', 'price': 1.40},
+    {'code': '33', 'name': 'الهند', 'flag': '🇮🇳', 'price': 0.90},
+    {'code': '34', 'name': 'باكستان', 'flag': '🇵🇰', 'price': 1.20},
+    {'code': '35', 'name': 'بنغلاديش', 'flag': '🇧🇩', 'price': 1.10},
+    {'code': '36', 'name': 'الفلبين', 'flag': '🇵🇭', 'price': 1.30},
+    {'code': '37', 'name': 'ماليزيا', 'flag': '🇲🇾', 'price': 1.70},
+    {'code': '38', 'name': 'سنغافورة', 'flag': '🇸🇬', 'price': 2.00},
+    {'code': '39', 'name': 'تايلاند', 'flag': '🇹🇭', 'price': 1.60},
+    {'code': '40', 'name': 'فيتنام', 'flag': '🇻🇳', 'price': 1.00},
+    {'code': '41', 'name': 'أستراليا', 'flag': '🇦🇺', 'price': 2.40},
+    {'code': '42', 'name': 'نيوزيلندا', 'flag': '🇳🇿', 'price': 2.30},
+    {'code': '43', 'name': 'المكسيك', 'flag': '🇲🇽', 'price': 1.90},
+    {'code': '44', 'name': 'البرازيل', 'flag': '🇧🇷', 'price': 2.00},
+    {'code': '45', 'name': 'الأرجنتين', 'flag': '🇦🇷', 'price': 1.80},
+    {'code': '46', 'name': 'كولومبيا', 'flag': '🇨🇴', 'price': 1.70},
+    {'code': '47', 'name': 'بيرو', 'flag': '🇵🇪', 'price': 1.60},
+    {'code': '48', 'name': 'تشيلي', 'flag': '🇨🇱', 'price': 1.80},
+    {'code': '49', 'name': 'فنزويلا', 'flag': '🇻🇪', 'price': 1.50},
+    {'code': '50', 'name': 'الإكوادور', 'flag': '🇪🇨', 'price': 1.50},
+    {'code': '51', 'name': 'غواتيمالا', 'flag': '🇬🇹', 'price': 1.40},
+    {'code': '52', 'name': 'كوبا', 'flag': '🇨🇺', 'price': 1.50},
+    {'code': '53', 'name': 'هايتي', 'flag': '🇭🇹', 'price': 1.30},
+    {'code': '54', 'name': 'جمهورية الدومينيكان', 'flag': '🇩🇴', 'price': 1.50},
+    {'code': '55', 'name': 'هندوراس', 'flag': '🇭🇳', 'price': 1.30},
+    {'code': '56', 'name': 'نيكاراغوا', 'flag': '🇳🇮', 'price': 1.30},
+    {'code': '57', 'name': 'بنما', 'flag': '🇵🇦', 'price': 1.40},
+    {'code': '58', 'name': 'السلفادور', 'flag': '🇸🇻', 'price': 1.30},
+    {'code': '59', 'name': 'كوستاريكا', 'flag': '🇨🇷', 'price': 1.40},
+    {'code': '60', 'name': 'باراغواي', 'flag': '🇵🇾', 'price': 1.40},
+    {'code': '61', 'name': 'أوروغواي', 'flag': '🇺🇾', 'price': 1.60},
+    {'code': '62', 'name': 'بوليفيا', 'flag': '🇧🇴', 'price': 1.40},
+    {'code': '63', 'name': 'غيانا', 'flag': '🇬🇾', 'price': 1.30},
+    {'code': '64', 'name': 'سورينام', 'flag': '🇸🇷', 'price': 1.30},
+    {'code': '65', 'name': 'غويانا الفرنسية', 'flag': '🇬🇫', 'price': 1.40},
+    {'code': '66', 'name': 'الجزائر', 'flag': '🇩🇿', 'price': 1.50},
+    {'code': '67', 'name': 'المغرب', 'flag': '🇲🇦', 'price': 1.50},
+    {'code': '68', 'name': 'تونس', 'flag': '🇹🇳', 'price': 1.40},
+    {'code': '69', 'name': 'ليبيا', 'flag': '🇱🇾', 'price': 1.60},
+    {'code': '70', 'name': 'السودان', 'flag': '🇸🇩', 'price': 1.30},
+    {'code': '71', 'name': 'مصر', 'flag': '🇪🇬', 'price': 1.20},
+    {'code': '72', 'name': 'الصومال', 'flag': '🇸🇴', 'price': 1.40},
+    {'code': '73', 'name': 'جيبوتي', 'flag': '🇩🇯', 'price': 1.30},
+    {'code': '74', 'name': 'كينيا', 'flag': '🇰🇪', 'price': 1.30},
+    {'code': '75', 'name': 'تنزانيا', 'flag': '🇹🇿', 'price': 1.20},
+    {'code': '76', 'name': 'أوغندا', 'flag': '🇺🇬', 'price': 1.20},
+    {'code': '77', 'name': 'رواندا', 'flag': '🇷🇼', 'price': 1.10},
+    {'code': '78', 'name': 'بوروندي', 'flag': '🇧🇮', 'price': 1.10},
+    {'code': '79', 'name': 'إثيوبيا', 'flag': '🇪🇹', 'price': 1.20},
+    {'code': '80', 'name': 'إريتريا', 'flag': '🇪🇷', 'price': 1.10},
+    {'code': '81', 'name': 'جنوب السودان', 'flag': '🇸🇸', 'price': 1.10},
+    {'code': '82', 'name': 'الكونغو الديمقراطية', 'flag': '🇨🇩', 'price': 1.10},
+    {'code': '83', 'name': 'الكونغو', 'flag': '🇨🇬', 'price': 1.10},
+    {'code': '84', 'name': 'الجابون', 'flag': '🇬🇦', 'price': 1.30},
+    {'code': '85', 'name': 'غينيا الاستوائية', 'flag': '🇬🇶', 'price': 1.20},
+    {'code': '86', 'name': 'الكاميرون', 'flag': '🇨🇲', 'price': 1.20},
+    {'code': '87', 'name': 'نيجيريا', 'flag': '🇳🇬', 'price': 1.40},
+    {'code': '88', 'name': 'غانا', 'flag': '🇬🇭', 'price': 1.20},
+    {'code': '89', 'name': 'ساحل العاج', 'flag': '🇨🇮', 'price': 1.20},
+    {'code': '90', 'name': 'بوركينا فاسو', 'flag': '🇧🇫', 'price': 1.10},
+    {'code': '91', 'name': 'مالي', 'flag': '🇲🇱', 'price': 1.10},
+    {'code': '92', 'name': 'النيجر', 'flag': '🇳🇪', 'price': 1.10},
+    {'code': '93', 'name': 'تشاد', 'flag': '🇹🇩', 'price': 1.10},
+    {'code': '94', 'name': 'موريتانيا', 'flag': '🇲🇷', 'price': 1.30},
+    {'code': '95', 'name': 'السنغال', 'flag': '🇸🇳', 'price': 1.20},
+    {'code': '96', 'name': 'غامبيا', 'flag': '🇬🇲', 'price': 1.10},
+    {'code': '97', 'name': 'غينيا بيساو', 'flag': '🇬🇼', 'price': 1.10},
+    {'code': '98', 'name': 'غينيا', 'flag': '🇬🇳', 'price': 1.10},
+    {'code': '99', 'name': 'سيراليون', 'flag': '🇸🇱', 'price': 1.10},
+    {'code': '100', 'name': 'ليبيريا', 'flag': '🇱🇷', 'price': 1.10}
 ]
 
 # عدد الدول في كل صفحة
-COUNTRIES_PER_PAGE = 10
+COUNTRIES_PER_PAGE = 8
 
 # قاموس مؤقت لتخزين بيانات المستخدمين
 user_data = {}
+
+# قواميس مساعدة للدول
+country_names = {str(c['code']): c['name'] for c in COUNTRIES}
+country_flags = {str(c['code']): c['flag'] for c in COUNTRIES}
 
 def setup_bot(bot):
     """إعداد جميع معالجات البوت"""
@@ -174,7 +237,12 @@ def setup_bot(bot):
 🔹 **الخدمات المتاحة:**
 • تلغرام - واتساب - Viber
 • Gmail - Uber - Avito
-• وأكثر من 80 دولة حول العالم
+• وأكثر من 100 دولة حول العالم
+
+🔹 **المميزات:**
+• اختيار السيرفر (المشغل) المناسب
+• إلغاء الرقم واسترداد الرصيد
+• إعادة إرسال رمز التفعيل
 
 🔹 **الأوامر:**
 /buy - شراء رقم جديد
@@ -235,14 +303,19 @@ def setup_bot(bot):
 **كيفية الشراء:**
 1️⃣ اختر الخدمة المطلوبة
 2️⃣ اختر الدولة (مع عرض السعر)
-3️⃣ قم بتأكيد الشراء
-4️⃣ استلم الرقم ورمز التفعيل
+3️⃣ اختر السيرفر (المشغل) المناسب
+4️⃣ قم بتأكيد الشراء
+
+**بعد الشراء:**
+• يمكنك إعادة إرسال رمز التفعيل
+• يمكنك إلغاء الرقم واسترداد الرصيد
+• يمكنك الاستعلام عن حالة الرقم
 
 **ملاحظات مهمة:**
 • يتم خصم المبلغ من رصيدك عند التأكيد
 • صلاحية الرقم 20 دقيقة
 • يمكنك إلغاء العملية في أي وقت
-• تتوفر أكثر من 80 دولة للاختيار من بينها
+• تتوفر أكثر من 100 دولة للاختيار من بينها
         """
         bot.reply_to(message, help_text, parse_mode='Markdown')
     
@@ -325,7 +398,7 @@ def setup_bot(bot):
         keyboard.row(*nav_buttons)
         
         # إضافة زر الرجوع
-        keyboard.add(types.InlineKeyboardButton("🔙 رجوع", callback_data="buy"))
+        keyboard.add(types.InlineKeyboardButton("🔙 رجوع للخدمات", callback_data="buy"))
         
         # حفظ الصفحة الحالية في بيانات المستخدم
         if user_id not in user_data:
@@ -471,72 +544,154 @@ def setup_bot(bot):
                 service = user_info.get('service', 'tg')
                 service_name = user_info.get('service_name', 'تلغرام')
                 
-                # البحث عن معلومات الدولة
-                selected_country = None
-                for c in COUNTRIES:
-                    if c['code'] == country:
-                        selected_country = c.copy()  # نسخ لتجنب التعديل على الأصل
-                        break
+                # جلب بيانات السيرفرات من API
+                bot.edit_message_text(
+                    "🔄 **جاري تحميل خيارات السيرفرات...**",
+                    call.message.chat.id,
+                    call.message.message_id,
+                    parse_mode='Markdown'
+                )
                 
-                if not selected_country:
-                    selected_country = {'code': country, 'name': 'غير معروفة', 'flag': '🏳️', 'price': 1.0}
-                
-                # محاولة الحصول على السعر الحقيقي من API
-                if api_client and service:
+                operators_data = {}
+                if api_client:
                     try:
-                        prices_data = api_client.get_prices(service)
-                        if prices_data and country in prices_data and service in prices_data[country]:
-                            selected_country['price'] = prices_data[country][service].get('cost', selected_country['price'])
-                            logger.info(f"💰 السعر الحقيقي للدولة {country}: ${selected_country['price']}")
+                        # جلب بيانات السيرفرات للدولة والخدمة المحددة
+                        prices_data = api_client.get_services_with_operators(service, int(country))
+                        if prices_data and country in prices_data:
+                            country_data = prices_data[country]
+                            if service in country_data:
+                                operators_data = country_data[service]
+                                logger.info(f"✅ تم جلب {len(operators_data)} سيرفر للدولة {country}")
                     except Exception as e:
-                        logger.error(f"خطأ في جلب السعر للدولة {country}: {e}")
+                        logger.error(f"❌ خطأ في جلب السيرفرات: {e}")
                 
-                country_name = selected_country['name']
-                country_flag = selected_country['flag']
-                price = selected_country['price']
+                # عرض قائمة السيرفرات
+                keyboard = types.InlineKeyboardMarkup(row_width=1)
                 
-                # حفظ الدولة
+                if operators_data and isinstance(operators_data, dict):
+                    # عرض السيرفرات المتاحة من API
+                    for operator, data in operators_data.items():
+                        if isinstance(data, dict) and 'cost' in data:
+                            price = data['cost']
+                            count = data.get('count', 0)
+                            operator_name = OPERATOR_NAMES.get(operator, f'📡 سيرفر {operator}')
+                            
+                            # إضافة عدد الأرقام المتاحة إذا كان موجوداً
+                            if count > 0:
+                                button_text = f"{operator_name} - ${price:.2f} (متاح: {count})"
+                            else:
+                                button_text = f"{operator_name} - ${price:.2f}"
+                            
+                            keyboard.add(types.InlineKeyboardButton(
+                                button_text,
+                                callback_data=f"operator_{country}_{operator}"
+                            ))
+                else:
+                    # إذا لم توجد بيانات، استخدم السيرفرات الافتراضية
+                    default_operators = [
+                        ('any', '🔄 أي مشغل', 0.5),
+                        ('mts', '📡 MTS', 0.6),
+                        ('beeline', '📡 Beeline', 0.55),
+                        ('megafon', '📡 Megafon', 0.58),
+                        ('tele2', '📡 Tele2', 0.52),
+                    ]
+                    
+                    for op_code, op_name, op_price in default_operators:
+                        button_text = f"{op_name} - ${op_price:.2f}"
+                        keyboard.add(types.InlineKeyboardButton(
+                            button_text,
+                            callback_data=f"operator_{country}_{op_code}"
+                        ))
+                
+                keyboard.add(types.InlineKeyboardButton("🔙 رجوع للدول", callback_data=f"service_{service}"))
+                
+                # ترجمة اسم الدولة
+                country_name = country_names.get(country, f'دولة {country}')
+                country_flag = country_flags.get(country, '🏳️')
+                
+                # حفظ معلومات الدولة
                 if user_id not in user_data:
                     user_data[user_id] = {}
                 user_data[user_id]['country'] = country
                 user_data[user_id]['country_name'] = country_name
                 user_data[user_id]['country_flag'] = country_flag
-                user_data[user_id]['price'] = price
-                
-                # عرض تأكيد الشراء مع السعر
-                keyboard = types.InlineKeyboardMarkup(row_width=2)
-                keyboard.add(
-                    types.InlineKeyboardButton("✅ تأكيد الشراء", callback_data="confirm"),
-                    types.InlineKeyboardButton("❌ إلغاء", callback_data="cancel")
-                )
-                
-                # إضافة زر الرجوع للدول مع حفظ الصفحة
-                back_page = user_info.get('current_page', 0)
-                keyboard.add(types.InlineKeyboardButton("🔙 رجوع للدول", callback_data=f"page_{service}_{back_page}"))
                 
                 bot.edit_message_text(
-                    f"📱 **تفاصيل الطلب**\n\n"
-                    f"الخدمة: {service_name}\n"
-                    f"الدولة: {country_flag} {country_name}\n"
-                    f"السعر: **${price:.2f}**\n\n"
-                    f"⚠️ هل تريد تأكيد الشراء؟",
+                    f"📱 **الخدمة:** {service_name}\n"
+                    f"🌍 **الدولة:** {country_flag} {country_name}\n\n"
+                    f"🔽 **اختر السيرفر المناسب:**",
                     call.message.chat.id,
                     call.message.message_id,
                     reply_markup=keyboard,
                     parse_mode='Markdown'
                 )
             
-            elif data == "confirm":
-                # تأكيد الشراء
+            elif data.startswith("operator_"):
+                parts = data.split('_')
+                if len(parts) >= 3:
+                    country = parts[1]
+                    operator = parts[2]
+                    
+                    # استرجاع بيانات المستخدم
+                    user_info = user_data.get(user_id, {})
+                    service = user_info.get('service', 'tg')
+                    service_name = user_info.get('service_name', 'تلغرام')
+                    country_name = user_info.get('country_name', country_names.get(country, 'غير معروفة'))
+                    country_flag = user_info.get('country_flag', country_flags.get(country, '🏳️'))
+                    
+                    # جلب السعر الحقيقي للسيرفر
+                    price = 0.5  # قيمة افتراضية
+                    if api_client:
+                        try:
+                            prices_data = api_client.get_services_with_operators(service, int(country))
+                            if prices_data and country in prices_data:
+                                country_data = prices_data[country]
+                                if service in country_data and operator in country_data[service]:
+                                    price = country_data[service][operator].get('cost', 0.5)
+                        except:
+                            pass
+                    
+                    # حفظ بيانات السيرفر
+                    if user_id not in user_data:
+                        user_data[user_id] = {}
+                    user_data[user_id]['operator'] = operator
+                    user_data[user_id]['operator_name'] = OPERATOR_NAMES.get(operator, f'سيرفر {operator}')
+                    user_data[user_id]['price'] = price
+                    
+                    # عرض تأكيد الشراء مع السيرفر
+                    operator_name = OPERATOR_NAMES.get(operator, f'سيرفر {operator}')
+                    
+                    keyboard = types.InlineKeyboardMarkup(row_width=2)
+                    keyboard.add(
+                        types.InlineKeyboardButton("✅ تأكيد الشراء", callback_data="confirm_purchase"),
+                        types.InlineKeyboardButton("❌ إلغاء", callback_data="cancel")
+                    )
+                    keyboard.add(types.InlineKeyboardButton("🔙 اختيار سيرفر آخر", callback_data=f"country_{country}"))
+                    
+                    bot.edit_message_text(
+                        f"📱 **تأكيد الطلب**\n\n"
+                        f"الخدمة: {service_name}\n"
+                        f"الدولة: {country_flag} {country_name}\n"
+                        f"السيرفر: {operator_name}\n"
+                        f"السعر: **${price:.2f}**\n\n"
+                        f"⚠️ هل تريد تأكيد الشراء؟",
+                        call.message.chat.id,
+                        call.message.message_id,
+                        reply_markup=keyboard,
+                        parse_mode='Markdown'
+                    )
+            
+            elif data == "confirm_purchase":
                 user_info = user_data.get(user_id, {})
                 service = user_info.get('service', 'tg')
                 service_name = user_info.get('service_name', 'تلغرام')
-                country = user_info.get('country', '6')
-                country_name = user_info.get('country_name', 'روسيا')
-                country_flag = user_info.get('country_flag', '🇷🇺')
+                country = user_info.get('country', '1')
+                operator = user_info.get('operator', 'any')
+                country_name = user_info.get('country_name', country_names.get(country, 'روسيا'))
+                country_flag = user_info.get('country_flag', country_flags.get(country, '🇷🇺'))
+                operator_name = user_info.get('operator_name', 'أي مشغل')
                 price = user_info.get('price', 0.5)
                 
-                # رسالة انتظار
                 bot.edit_message_text(
                     "🔄 **جاري طلب الرقم...**\n\nالرجاء الانتظار",
                     call.message.chat.id,
@@ -544,17 +699,29 @@ def setup_bot(bot):
                     parse_mode='Markdown'
                 )
                 
-                # محاولة طلب رقم من API
                 if api_client:
                     try:
-                        country_int = int(country) if country.isdigit() else 6
-                        number_data = api_client.get_number(service, country_int)
+                        country_int = int(country) if country.isdigit() else 1
                         
-                        logger.info(f"📞 استجابة get_number: {number_data}")
+                        # استخدام المعاملات مع السيرفر
+                        number_data = api_client.get_number_with_operator(service, country_int, operator)
+                        
+                        logger.info(f"📞 استجابة get_number_with_operator: {number_data}")
                         
                         if number_data and number_data.get('success', False):
                             phone = number_data.get('phoneNumber')
                             activation_id = number_data.get('activationId')
+                            
+                            # أزرار التحكم
+                            control_keyboard = types.InlineKeyboardMarkup(row_width=2)
+                            control_keyboard.add(
+                                types.InlineKeyboardButton("🔄 إعادة إرسال الرمز", callback_data=f"resend_{activation_id}"),
+                                types.InlineKeyboardButton("❌ إلغاء الرقم", callback_data=f"cancel_{activation_id}")
+                            )
+                            control_keyboard.add(
+                                types.InlineKeyboardButton("📋 حالة الرقم", callback_data=f"status_{activation_id}"),
+                                types.InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back")
+                            )
                             
                             bot.edit_message_text(
                                 f"✅ **تم شراء الرقم بنجاح!**\n\n"
@@ -562,11 +729,12 @@ def setup_bot(bot):
                                 f"🆔 **معرف التفعيل:** `{activation_id}`\n"
                                 f"💰 **السعر:** ${price:.2f}\n"
                                 f"🌍 **الدولة:** {country_flag} {country_name}\n"
+                                f"📡 **السيرفر:** {operator_name}\n"
                                 f"📱 **الخدمة:** {service_name}\n\n"
-                                f"⏱️ الرقم صالح لمدة 20 دقيقة\n"
-                                f"📨 سيتم إعلامك عند وصول رسالة جديدة",
+                                f"⏱️ الرقم صالح لمدة 20 دقيقة",
                                 call.message.chat.id,
                                 call.message.message_id,
+                                reply_markup=control_keyboard,
                                 parse_mode='Markdown'
                             )
                         else:
@@ -579,6 +747,7 @@ def setup_bot(bot):
                                 f"السبب: {error_msg}\n\n"
                                 f"💰 السعر: ${price:.2f}\n"
                                 f"🌍 الدولة: {country_flag} {country_name}\n"
+                                f"📡 السيرفر: {operator_name}\n"
                                 f"📱 الخدمة: {service_name}\n\n"
                                 f"⚠️ يرجى المحاولة لاحقاً",
                                 call.message.chat.id,
@@ -592,6 +761,7 @@ def setup_bot(bot):
                             f"السبب: خطأ تقني\n\n"
                             f"💰 السعر: ${price:.2f}\n"
                             f"🌍 الدولة: {country_flag} {country_name}\n"
+                            f"📡 السيرفر: {operator_name}\n"
                             f"📱 الخدمة: {service_name}",
                             call.message.chat.id,
                             call.message.message_id,
@@ -606,6 +776,7 @@ def setup_bot(bot):
                         f"📱 **الرقم:** `{phone}`\n"
                         f"💰 **السعر:** ${price:.2f}\n"
                         f"🌍 **الدولة:** {country_flag} {country_name}\n"
+                        f"📡 **السيرفر:** {operator_name}\n"
                         f"📱 **الخدمة:** {service_name}\n\n"
                         f"⚠️ هذا رقم تجريبي (API غير مهيأ)",
                         call.message.chat.id,
@@ -616,6 +787,64 @@ def setup_bot(bot):
                 # مسح بيانات المستخدم بعد الشراء
                 if user_id in user_data:
                     del user_data[user_id]
+            
+            elif data.startswith("resend_"):
+                activation_id = data.replace("resend_", "")
+                # طلب إعادة إرسال الرمز
+                if api_client:
+                    try:
+                        result = api_client.set_status(int(activation_id), 3)  # 3 = طلب إعادة SMS
+                        if result:
+                            bot.answer_callback_query(call.id, "✅ تم طلب إعادة إرسال الرمز")
+                        else:
+                            bot.answer_callback_query(call.id, "❌ فشل طلب إعادة الإرسال")
+                    except Exception as e:
+                        logger.error(f"خطأ في إعادة الإرسال: {e}")
+                        bot.answer_callback_query(call.id, "❌ حدث خطأ")
+                else:
+                    bot.answer_callback_query(call.id, "❌ API غير متاح")
+            
+            elif data.startswith("cancel_"):
+                activation_id = data.replace("cancel_", "")
+                # إلغاء الرقم واسترداد الرصيد
+                if api_client:
+                    try:
+                        result = api_client.set_status(int(activation_id), 8)  # 8 = إلغاء واسترداد
+                        if result:
+                            bot.edit_message_text(
+                                f"✅ **تم إلغاء الرقم بنجاح!**\n\n"
+                                f"🆔 معرف التفعيل: {activation_id}\n"
+                                f"💰 تم استرداد الرصيد إلى حسابك",
+                                call.message.chat.id,
+                                call.message.message_id,
+                                parse_mode='Markdown'
+                            )
+                        else:
+                            bot.answer_callback_query(call.id, "❌ فشل إلغاء الرقم")
+                    except Exception as e:
+                        logger.error(f"خطأ في إلغاء الرقم: {e}")
+                        bot.answer_callback_query(call.id, "❌ حدث خطأ")
+                else:
+                    bot.answer_callback_query(call.id, "❌ API غير متاح")
+            
+            elif data.startswith("status_"):
+                activation_id = data.replace("status_", "")
+                # الاستعلام عن حالة الرقم
+                if api_client:
+                    try:
+                        status = api_client.get_status(int(activation_id))
+                        status_messages = {
+                            'STATUS_WAIT_CODE': '⏳ في انتظار الرمز',
+                            'STATUS_OK': '✅ تم استلام الرمز',
+                            'STATUS_CANCEL': '❌ ملغي'
+                        }
+                        status_text = status_messages.get(status, f'حالة غير معروفة: {status}')
+                        bot.answer_callback_query(call.id, f"حالة الرقم: {status_text}")
+                    except Exception as e:
+                        logger.error(f"خطأ في الاستعلام عن الحالة: {e}")
+                        bot.answer_callback_query(call.id, "❌ حدث خطأ")
+                else:
+                    bot.answer_callback_query(call.id, "❌ API غير متاح")
             
             elif data == "cancel":
                 # إلغاء العملية
