@@ -5,7 +5,7 @@ import os
 import random
 import time
 import json
-from flask import jsonify
+import traceback
 from sms_activate_api import HeroSMSAPI
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 api_client = None
 admin_ids = []
 bot_instance = None
-app = None  # مرجع لتطبيق Flask
+app = None
+
+# قائمة المشرفين المسموح لهم بالشراء (سيتم ملؤها من ADMIN_IDS)
+ALLOWED_USERS = []
 
 # الخدمات المتاحة
 AVAILABLE_SERVICES = {
@@ -56,22 +59,7 @@ OPERATOR_NAMES = {
     'tinkoff': '📡 Tinkoff',
     'yota': '📡 Yota',
     'sber': '📡 Sber',
-    'megafon': '📡 Megafon',
 }
-
-# دالة للحصول على اسم السيرفر بشكل مناسب
-def get_operator_name(operator_code):
-    """الحصول على اسم مناسب للسيرفر"""
-    if operator_code in OPERATOR_NAMES:
-        return OPERATOR_NAMES[operator_code]
-    
-    # محاولة تنسيق الاسم إذا كان رمزاً
-    if operator_code.startswith('opt') or operator_code.startswith('server'):
-        return f"📡 {operator_code.upper()}"
-    elif operator_code.isdigit():
-        return f"📡 سيرفر {operator_code}"
-    else:
-        return f"📡 {operator_code.capitalize()}"
 
 # قاموس رموز المشغلين (اختصاري)
 OPERATOR_CODES = {
@@ -96,6 +84,20 @@ OPERATOR_CODES = {
     'mobily': 'mobily',
     'virgin': 'virgin',
 }
+
+# دالة للحصول على اسم السيرفر بشكل مناسب
+def get_operator_name(operator_code):
+    """الحصول على اسم مناسب للسيرفر"""
+    if operator_code in OPERATOR_NAMES:
+        return OPERATOR_NAMES[operator_code]
+    
+    # محاولة تنسيق الاسم إذا كان رمزاً
+    if operator_code.startswith('opt') or operator_code.startswith('server'):
+        return f"📡 {operator_code.upper()}"
+    elif operator_code.isdigit():
+        return f"📡 سيرفر {operator_code}"
+    else:
+        return f"📡 {operator_code.capitalize()}"
 
 # قائمة شاملة بجميع الدول المتاحة (مع رموزها ورموز الأعلام)
 COUNTRIES = [
@@ -183,42 +185,7 @@ COUNTRIES = [
     {'code': '62', 'name': 'بوليفيا', 'flag': '🇧🇴', 'price': 1.40},
     {'code': '63', 'name': 'غيانا', 'flag': '🇬🇾', 'price': 1.30},
     {'code': '64', 'name': 'سورينام', 'flag': '🇸🇷', 'price': 1.30},
-    {'code': '65', 'name': 'غويانا الفرنسية', 'flag': '🇬🇫', 'price': 1.40},
-    {'code': '66', 'name': 'الجزائر', 'flag': '🇩🇿', 'price': 1.50},
-    {'code': '67', 'name': 'المغرب', 'flag': '🇲🇦', 'price': 1.50},
-    {'code': '68', 'name': 'تونس', 'flag': '🇹🇳', 'price': 1.40},
-    {'code': '69', 'name': 'ليبيا', 'flag': '🇱🇾', 'price': 1.60},
-    {'code': '70', 'name': 'السودان', 'flag': '🇸🇩', 'price': 1.30},
-    {'code': '71', 'name': 'مصر', 'flag': '🇪🇬', 'price': 1.20},
-    {'code': '72', 'name': 'الصومال', 'flag': '🇸🇴', 'price': 1.40},
-    {'code': '73', 'name': 'جيبوتي', 'flag': '🇩🇯', 'price': 1.30},
-    {'code': '74', 'name': 'كينيا', 'flag': '🇰🇪', 'price': 1.30},
-    {'code': '75', 'name': 'تنزانيا', 'flag': '🇹🇿', 'price': 1.20},
-    {'code': '76', 'name': 'أوغندا', 'flag': '🇺🇬', 'price': 1.20},
-    {'code': '77', 'name': 'رواندا', 'flag': '🇷🇼', 'price': 1.10},
-    {'code': '78', 'name': 'بوروندي', 'flag': '🇧🇮', 'price': 1.10},
-    {'code': '79', 'name': 'إثيوبيا', 'flag': '🇪🇹', 'price': 1.20},
-    {'code': '80', 'name': 'إريتريا', 'flag': '🇪🇷', 'price': 1.10},
-    {'code': '81', 'name': 'جنوب السودان', 'flag': '🇸🇸', 'price': 1.10},
-    {'code': '82', 'name': 'الكونغو الديمقراطية', 'flag': '🇨🇩', 'price': 1.10},
-    {'code': '83', 'name': 'الكونغو', 'flag': '🇨🇬', 'price': 1.10},
-    {'code': '84', 'name': 'الجابون', 'flag': '🇬🇦', 'price': 1.30},
-    {'code': '85', 'name': 'غينيا الاستوائية', 'flag': '🇬🇶', 'price': 1.20},
-    {'code': '86', 'name': 'الكاميرون', 'flag': '🇨🇲', 'price': 1.20},
-    {'code': '87', 'name': 'نيجيريا', 'flag': '🇳🇬', 'price': 1.40},
-    {'code': '88', 'name': 'غانا', 'flag': '🇬🇭', 'price': 1.20},
-    {'code': '89', 'name': 'ساحل العاج', 'flag': '🇨🇮', 'price': 1.20},
-    {'code': '90', 'name': 'بوركينا فاسو', 'flag': '🇧🇫', 'price': 1.10},
-    {'code': '91', 'name': 'مالي', 'flag': '🇲🇱', 'price': 1.10},
-    {'code': '92', 'name': 'النيجر', 'flag': '🇳🇪', 'price': 1.10},
-    {'code': '93', 'name': 'تشاد', 'flag': '🇹🇩', 'price': 1.10},
-    {'code': '94', 'name': 'موريتانيا', 'flag': '🇲🇷', 'price': 1.30},
-    {'code': '95', 'name': 'السنغال', 'flag': '🇸🇳', 'price': 1.20},
-    {'code': '96', 'name': 'غامبيا', 'flag': '🇬🇲', 'price': 1.10},
-    {'code': '97', 'name': 'غينيا بيساو', 'flag': '🇬🇼', 'price': 1.10},
-    {'code': '98', 'name': 'غينيا', 'flag': '🇬🇳', 'price': 1.10},
-    {'code': '99', 'name': 'سيراليون', 'flag': '🇸🇱', 'price': 1.10},
-    {'code': '100', 'name': 'ليبيريا', 'flag': '🇱🇷', 'price': 1.10}
+    {'code': '65', 'name': 'غويانا الفرنسية', 'flag': '🇬🇫', 'price': 1.40}
 ]
 
 # عدد الدول في كل صفحة
@@ -233,7 +200,7 @@ country_flags = {str(c['code']): c['flag'] for c in COUNTRIES}
 
 def setup_bot(bot, flask_app=None):
     """إعداد جميع معالجات البوت"""
-    global api_client, admin_ids, bot_instance, app
+    global api_client, admin_ids, bot_instance, app, ALLOWED_USERS
     
     # حفظ مرجع البوت وتطبيق Flask
     bot_instance = bot
@@ -246,6 +213,23 @@ def setup_bot(bot, flask_app=None):
         logger.info("✅ تم تهيئة API client")
     else:
         logger.warning("⚠️ SMS_ACTIVATE_API_KEY غير موجودة - سيتم استخدام وضع التجربة")
+    
+    # قراءة معرفات المشرفين
+    admin_ids_str = os.environ.get('ADMIN_IDS', '')
+    admin_ids = [int(id.strip()) for id in admin_ids_str.split(',') if id.strip().isdigit()]
+    
+    # تعيين المشرفين كالمستخدمين المسموح لهم
+    ALLOWED_USERS = admin_ids.copy()
+    logger.info(f"✅ تم تحميل {len(ALLOWED_USERS)} مشرف مسموح له بالشراء: {ALLOWED_USERS}")
+    
+    # دالة للتحقق من صلاحية المستخدم
+    def is_allowed(user_id):
+        """التحقق مما إذا كان المستخدم مسموحاً له باستخدام البوت"""
+        return user_id in ALLOWED_USERS
+    
+    # دالة لرد غير المسموح لهم
+    def not_allowed_response(message):
+        bot.reply_to(message, "❌ **عذراً!** هذا البوت مخصص للمشرفين فقط.\n\nإذا كنت مشرفاً، تأكد من إضافة معرفك في إعدادات البوت.", parse_mode='Markdown')
     
     # إضافة نقطة اختبار للتصحيح إذا كان تطبيق Flask متاحاً
     if app:
@@ -274,13 +258,15 @@ def setup_bot(bot, flask_app=None):
         
         logger.info("✅ تم إضافة نقطة اختبار /debug_prices/<service>/<country>")
     
-    # قراءة معرفات المشرفين
-    admin_ids_str = os.environ.get('ADMIN_IDS', '')
-    admin_ids = [int(id.strip()) for id in admin_ids_str.split(',') if id.strip().isdigit()]
-    
     @bot.message_handler(commands=['start'])
     def start_command(message):
         """معالج أمر /start"""
+        user_id = message.from_user.id
+        
+        if not is_allowed(user_id):
+            not_allowed_response(message)
+            return
+        
         user = message.from_user
         welcome_text = f"""
 👋 مرحباً {user.first_name}!
@@ -290,7 +276,6 @@ def setup_bot(bot, flask_app=None):
 🔹 **الخدمات المتاحة:**
 • تلغرام - واتساب - Viber
 • Gmail - Uber - Avito
-• وأكثر من 100 دولة حول العالم
 
 🔹 **المميزات:**
 • اختيار السيرفر (المشغل) المناسب
@@ -316,13 +301,19 @@ def setup_bot(bot, flask_app=None):
     @bot.message_handler(commands=['balance'])
     def balance_command(message):
         """معالج أمر /balance"""
+        user_id = message.from_user.id
+        
+        if not is_allowed(user_id):
+            not_allowed_response(message)
+            return
+        
         if not api_client:
             bot.reply_to(message, "❌ API غير مهيأ - وضع التجربة نشط")
             return
         
         try:
             balance = api_client.get_balance()
-            bot.reply_to(message, f"💰 رصيدك الحالي: **{balance}** دولار", parse_mode='Markdown')
+            bot.reply_to(message, f"💰 **رصيد API الحالي:** {balance} دولار\n\n🔐 هذا الرصيد خاص بالمشرفين فقط", parse_mode='Markdown')
         except Exception as e:
             logger.error(f"خطأ في جلب الرصيد: {e}")
             bot.reply_to(message, "❌ حدث خطأ في جلب الرصيد")
@@ -330,6 +321,12 @@ def setup_bot(bot, flask_app=None):
     @bot.message_handler(commands=['buy'])
     def buy_command(message):
         """معالج أمر /buy"""
+        user_id = message.from_user.id
+        
+        if not is_allowed(user_id):
+            not_allowed_response(message)
+            return
+        
         keyboard = types.InlineKeyboardMarkup(row_width=2)
         
         buttons = []
@@ -344,6 +341,12 @@ def setup_bot(bot, flask_app=None):
     @bot.message_handler(commands=['help'])
     def help_command(message):
         """معالج أمر /help"""
+        user_id = message.from_user.id
+        
+        if not is_allowed(user_id):
+            not_allowed_response(message)
+            return
+        
         help_text = """
 ❓ **مساعدة البوت**
 
@@ -355,9 +358,10 @@ def setup_bot(bot, flask_app=None):
 
 **كيفية الشراء:**
 1️⃣ اختر الخدمة المطلوبة
-2️⃣ اختر الدولة (مع عرض السعر)
-3️⃣ اختر السيرفر (المشغل) المناسب
+2️⃣ اختر الدولة
+3️⃣ اختر السيرفر المناسب
 4️⃣ قم بتأكيد الشراء
+5️⃣ استلم الرقم ورمز التفعيل
 
 **بعد الشراء:**
 • يمكنك إعادة إرسال رمز التفعيل
@@ -365,36 +369,88 @@ def setup_bot(bot, flask_app=None):
 • يمكنك الاستعلام عن حالة الرقم
 
 **ملاحظات مهمة:**
-• يتم خصم المبلغ من رصيدك عند التأكيد
+• هذا البوت مخصص للمشرفين فقط
+• يتم خصم المبلغ من رصيد API عند التأكيد
 • صلاحية الرقم 20 دقيقة
 • يمكنك إلغاء العملية في أي وقت
-• تتوفر أكثر من 100 دولة للاختيار من بينها
         """
         bot.reply_to(message, help_text, parse_mode='Markdown')
     
-    @bot.message_handler(commands=['admin'])
-    def admin_command(message):
-        """معالج أوامر المشرفين"""
+    @bot.message_handler(commands=['adduser'])
+    def add_user_command(message):
+        """إضافة مستخدم جديد (للمشرفين فقط)"""
+        user_id = message.from_user.id
+        
+        # فقط المشرفين الرئيسيين يمكنهم إضافة مستخدمين جدد
+        if user_id not in admin_ids:
+            bot.reply_to(message, "❌ هذا الأمر مخصص للمشرفين الأساسيين فقط")
+            return
+        
+        try:
+            # تنسيق: /adduser 123456789
+            parts = message.text.split()
+            if len(parts) < 2:
+                bot.reply_to(message, "❌ الرجاء إدخال معرف المستخدم\nمثال: /adduser 123456789")
+                return
+            
+            new_user_id = int(parts[1])
+            if new_user_id not in ALLOWED_USERS:
+                ALLOWED_USERS.append(new_user_id)
+                bot.reply_to(message, f"✅ تم إضافة المستخدم {new_user_id} بنجاح")
+                logger.info(f"تم إضافة مستخدم جديد: {new_user_id}")
+            else:
+                bot.reply_to(message, f"ℹ️ المستخدم {new_user_id} موجود بالفعل")
+        except Exception as e:
+            bot.reply_to(message, f"❌ خطأ: {e}")
+    
+    @bot.message_handler(commands=['removeuser'])
+    def remove_user_command(message):
+        """حذف مستخدم (للمشرفين فقط)"""
+        user_id = message.from_user.id
+        
+        # فقط المشرفين الرئيسيين يمكنهم حذف مستخدمين
+        if user_id not in admin_ids:
+            bot.reply_to(message, "❌ هذا الأمر مخصص للمشرفين الأساسيين فقط")
+            return
+        
+        try:
+            # تنسيق: /removeuser 123456789
+            parts = message.text.split()
+            if len(parts) < 2:
+                bot.reply_to(message, "❌ الرجاء إدخال معرف المستخدم\nمثال: /removeuser 123456789")
+                return
+            
+            remove_user_id = int(parts[1])
+            if remove_user_id in ALLOWED_USERS and remove_user_id not in admin_ids:
+                ALLOWED_USERS.remove(remove_user_id)
+                bot.reply_to(message, f"✅ تم حذف المستخدم {remove_user_id} بنجاح")
+                logger.info(f"تم حذف المستخدم: {remove_user_id}")
+            elif remove_user_id in admin_ids:
+                bot.reply_to(message, "❌ لا يمكن حذف المشرف الأساسي")
+            else:
+                bot.reply_to(message, f"ℹ️ المستخدم {remove_user_id} غير موجود")
+        except Exception as e:
+            bot.reply_to(message, f"❌ خطأ: {e}")
+    
+    @bot.message_handler(commands=['users'])
+    def list_users_command(message):
+        """عرض قائمة المستخدمين المسموح لهم (للمشرفين فقط)"""
         user_id = message.from_user.id
         
         if user_id not in admin_ids:
-            bot.reply_to(message, "❌ هذا الأمر مخصص للمشرفين فقط")
+            bot.reply_to(message, "❌ هذا الأمر مخصص للمشرفين الأساسيين فقط")
             return
         
-        text = message.text.lower()
-        
-        if text == '/admin balance' and api_client:
-            try:
-                balance = api_client.get_balance()
-                bot.reply_to(message, f"💰 رصيد API: {balance} دولار")
-            except Exception as e:
-                bot.reply_to(message, f"❌ خطأ: {e}")
-        
-        elif text == '/admin stats':
-            bot.reply_to(message, f"📊 إحصائيات:\nالمستخدمين النشطين: {len(user_data)}")
-        
+        if ALLOWED_USERS:
+            users_text = "👥 **قائمة المستخدمين المسموح لهم:**\n\n"
+            for uid in ALLOWED_USERS:
+                if uid in admin_ids:
+                    users_text += f"👑 {uid} (مشرف أساسي)\n"
+                else:
+                    users_text += f"👤 {uid}\n"
+            bot.reply_to(message, users_text, parse_mode='Markdown')
         else:
-            bot.reply_to(message, "🔧 أوامر المشرفين:\n/admin balance - عرض رصيد API\n/admin stats - عرض إحصائيات")
+            bot.reply_to(message, "📭 لا يوجد مستخدمين مسموح لهم حالياً")
     
     def show_countries_page(call, service, service_name, page=0, prices_data=None):
         """عرض صفحة من الدول مع أزرار التنقل"""
@@ -474,9 +530,25 @@ def setup_bot(bot, flask_app=None):
     @bot.callback_query_handler(func=lambda call: True)
     def callback_handler(call):
         """معالج جميع الأزرار"""
+        user_id = call.from_user.id
+        
+        # التحقق من صلاحية المستخدم
+        if user_id not in ALLOWED_USERS:
+            bot.answer_callback_query(call.id, "❌ غير مسموح! هذا البوت للمشرفين فقط", show_alert=True)
+            # حذف رسالة الخطأ بعد ثواني
+            try:
+                bot.edit_message_text(
+                    "❌ **غير مسموح!**\n\nهذا البوت مخصص للمشرفين فقط.\nإذا كنت مشرفاً، تأكد من إضافة معرفك.",
+                    call.message.chat.id,
+                    call.message.message_id,
+                    parse_mode='Markdown'
+                )
+            except:
+                pass
+            return
+        
         try:
             data = call.data
-            user_id = call.from_user.id
             
             logger.info(f"🔘 زر مضغوط: {data} من المستخدم {user_id}")
             
@@ -490,7 +562,7 @@ def setup_bot(bot, flask_app=None):
                 try:
                     balance = api_client.get_balance()
                     bot.edit_message_text(
-                        f"💰 رصيدك الحالي: **{balance}** دولار",
+                        f"💰 **رصيد API الحالي:** {balance} دولار\n\n🔐 هذا الرصيد خاص بالمشرفين فقط",
                         call.message.chat.id,
                         call.message.message_id,
                         parse_mode='Markdown'
@@ -642,7 +714,6 @@ def setup_bot(bot, flask_app=None):
                                     operators_data = {'any': country_data}
                     except Exception as e:
                         logger.error(f"❌ خطأ في جلب السيرفرات: {e}")
-                        import traceback
                         traceback.print_exc()
                 
                 # تجهيز قائمة السيرفرات
@@ -666,13 +737,6 @@ def setup_bot(bot, flask_app=None):
                         ('beeline', {'cost': 0.55, 'count': 75}),
                         ('megafon', {'cost': 0.58, 'count': 60}),
                         ('tele2', {'cost': 0.52, 'count': 80}),
-                        ('vodafone', {'cost': 0.65, 'count': 40}),
-                        ('kyivstar', {'cost': 0.62, 'count': 45}),
-                        ('lifecell', {'cost': 0.59, 'count': 55}),
-                        ('orange', {'cost': 0.70, 'count': 30}),
-                        ('t-mobile', {'cost': 0.75, 'count': 25}),
-                        ('verizon', {'cost': 0.80, 'count': 20}),
-                        ('att', {'cost': 0.78, 'count': 22}),
                     ]
                     operators_list = default_operators
                 
@@ -919,7 +983,6 @@ def setup_bot(bot, flask_app=None):
                             )
                     except Exception as e:
                         logger.error(f"خطأ في طلب الرقم: {e}")
-                        import traceback
                         traceback.print_exc()
                         bot.edit_message_text(
                             f"❌ **فشل شراء الرقم**\n\n"
@@ -1029,16 +1092,97 @@ def setup_bot(bot, flask_app=None):
             
         except Exception as e:
             logger.error(f"خطأ في معالج الأزرار: {e}")
-            import traceback
             traceback.print_exc()
             try:
                 bot.answer_callback_query(call.id, "❌ حدث خطأ")
             except:
                 pass
     
+    @bot.message_handler(commands=['admin'])
+    def admin_command(message):
+        """معالج أوامر المشرفين"""
+        user_id = message.from_user.id
+        
+        if user_id not in admin_ids:
+            bot.reply_to(message, "❌ هذا الأمر مخصص للمشرفين الأساسيين فقط")
+            return
+        
+        text = message.text.lower()
+        
+        if text == '/admin balance' and api_client:
+            try:
+                balance = api_client.get_balance()
+                bot.reply_to(message, f"💰 **رصيد API:** {balance} دولار\n\n📊 **إحصائيات:**\n👥 المستخدمين المسموح لهم: {len(ALLOWED_USERS)}\n👑 المشرفين: {len(admin_ids)}", parse_mode='Markdown')
+            except Exception as e:
+                bot.reply_to(message, f"❌ خطأ: {e}")
+        
+        elif text == '/admin stats':
+            bot.reply_to(message, f"📊 **إحصائيات البوت:**\n\n👥 المستخدمين المسموح لهم: {len(ALLOWED_USERS)}\n👑 المشرفين الأساسيين: {len(admin_ids)}\n💾 المستخدمين النشطين: {len(user_data)}", parse_mode='Markdown')
+        
+        elif text.startswith('/admin adduser'):
+            # /admin adduser 123456789
+            parts = text.split()
+            if len(parts) >= 3:
+                try:
+                    new_user = int(parts[2])
+                    if new_user not in ALLOWED_USERS:
+                        ALLOWED_USERS.append(new_user)
+                        bot.reply_to(message, f"✅ تم إضافة المستخدم {new_user}")
+                    else:
+                        bot.reply_to(message, f"ℹ️ المستخدم {new_user} موجود بالفعل")
+                except:
+                    bot.reply_to(message, "❌ صيغة غير صحيحة\nاستخدم: /admin adduser 123456789")
+            else:
+                bot.reply_to(message, "❌ صيغة غير صحيحة\nاستخدم: /admin adduser 123456789")
+        
+        elif text.startswith('/admin removeuser'):
+            # /admin removeuser 123456789
+            parts = text.split()
+            if len(parts) >= 3:
+                try:
+                    remove_user = int(parts[2])
+                    if remove_user in ALLOWED_USERS and remove_user not in admin_ids:
+                        ALLOWED_USERS.remove(remove_user)
+                        bot.reply_to(message, f"✅ تم حذف المستخدم {remove_user}")
+                    elif remove_user in admin_ids:
+                        bot.reply_to(message, "❌ لا يمكن حذف المشرف الأساسي")
+                    else:
+                        bot.reply_to(message, f"ℹ️ المستخدم {remove_user} غير موجود")
+                except:
+                    bot.reply_to(message, "❌ صيغة غير صحيحة\nاستخدم: /admin removeuser 123456789")
+            else:
+                bot.reply_to(message, "❌ صيغة غير صحيحة\nاستخدم: /admin removeuser 123456789")
+        
+        elif text == '/admin users':
+            if ALLOWED_USERS:
+                users_text = "👥 **المستخدمين المسموح لهم:**\n\n"
+                for uid in ALLOWED_USERS:
+                    if uid in admin_ids:
+                        users_text += f"👑 {uid} (مشرف)\n"
+                    else:
+                        users_text += f"👤 {uid}\n"
+                bot.reply_to(message, users_text, parse_mode='Markdown')
+            else:
+                bot.reply_to(message, "📭 لا يوجد مستخدمين")
+        
+        else:
+            bot.reply_to(message, "🔧 **أوامر المشرفين:**\n\n"
+                         "/admin balance - عرض رصيد API والإحصائيات\n"
+                         "/admin stats - عرض إحصائيات البوت\n"
+                         "/admin adduser [id] - إضافة مستخدم\n"
+                         "/admin removeuser [id] - حذف مستخدم\n"
+                         "/admin users - عرض قائمة المستخدمين\n"
+                         "/admin help - عرض هذه المساعدة", parse_mode='Markdown')
+    
     @bot.message_handler(func=lambda message: True)
     def echo_all(message):
         """معالج الرسائل النصية العامة"""
+        user_id = message.from_user.id
+        
+        if not is_allowed(user_id):
+            not_allowed_response(message)
+            return
+        
         bot.reply_to(message, "❓ أمر غير معروف. أرسل /start للبدء")
     
     logger.info("✅ تم إعداد معالجات البوت بنجاح")
